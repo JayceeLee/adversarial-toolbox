@@ -97,3 +97,6 @@ OSDN/
 resnet/
 vgg/
 *.t7
+*.gz
+*.swp
+*.swo
