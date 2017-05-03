@@ -1,0 +1,7 @@
+numpy
+keras
+tensorflow
+theano
+scipy
+matplotlib
+pillow
