@@ -91,12 +91,20 @@ ENV/
 *.hkl
 *.hdf5
 *.JPEG
+*.png
+*.h5
 
 OSDN/
+deepfool/
+images/
+cifar-10-batches-py/
+npy/
+box/
+ckpts/
+
+*.sh
 *.net
-resnet/
-vgg/
-*.t7
 *.gz
 *.swp
 *.swo
+
