@@ -6,7 +6,6 @@ import argparse
 import numpy as np
 import tensorflow as tf
 import keras.backend as K
-import resnet
 import scipy.misc
 from PIL import Image
 
@@ -30,10 +29,9 @@ from cleverhans.utils import other_classes, cnn_model, pair_visual, grid_visual
 
 FLAGS = flags.FLAGS
 
-base = '/home/neale/repos/adversarial-toolbox/toolkit/tflearn/pool_4'
 
-flags.DEFINE_string('train_dir', base, 'Directory storing the saved model.')
-flags.DEFINE_string('filename', 'ckpts-58650', 'Filename to save model under.')
+flags.DEFINE_string('train_dir', os.getcwd(), 'Directory storing the saved model.')
+flags.DEFINE_string('filename', 'ckpt', 'Filename to save model under.')
 flags.DEFINE_integer('nb_epochs', 6, 'Number of epochs to train model')
 flags.DEFINE_integer('batch_size', 128, 'Size of training batches')
 flags.DEFINE_float('learning_rate', 0.01, 'Learning rate for training')
@@ -176,7 +174,7 @@ def generate_images():
     """ JSMA """
     if args.attack == 'jsma' or args.attack == 'JSMA':
 
-        result_dir = '/home/neale/repos/adversarial-toolbox/toolkit/box/images/jsma/'
+        result_dir = os.getcwd()+'/images/jsma/'
 	print('Crafting ' + str(FLAGS.source_samples) + ' * ' +
 	      str(FLAGS.nb_classes-1) + ' adversarial examples')
 

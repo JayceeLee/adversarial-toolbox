@@ -3,15 +3,15 @@
 
 # Data loading and preprocessing
 import keras
-import resnet
-from vgg15 import vgg15
-from genericnet import generic
+from models import resnet
+from models.vgg15 import vgg15
+from models.genericnet import generic
 import sys
 import numpy as np
 import tensorflow as tf
 import argparse
 
-from vgg6 import vggbn
+from models.vgg6 import vggbn
 from keras import backend
 from keras.utils import np_utils
 from tensorflow.python.platform import flags

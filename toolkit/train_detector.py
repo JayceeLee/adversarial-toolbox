@@ -1,4 +1,4 @@
-# coding: utf-8
+#coding: utf-8
 
 import keras
 import os
@@ -7,12 +7,11 @@ import glob
 import numpy as np
 import tensorflow as tf
 import argparse
-import resnet
 
-from vgg6 import vggbn
-from vgg15 import vgg15
-from keras import backend
-from genericnet import generic
+from models import resnet
+from models.vgg6 import vggbn
+from models.vgg15 import vgg15
+from models.genericnet import generic
 from generate import data_cifar10
 
 from keras import backend
@@ -21,6 +20,7 @@ from keras.models import Sequential
 from keras.utils import np_utils
 from keras.layers.core import Activation, Dense, Flatten, Dropout
 from PIL import Image
+import matplotlib.pyplot as plt
 
 def load_args():
 
@@ -28,9 +28,11 @@ def load_args():
   parser.add_argument('-m', '--model', default='vgg6', help='model name: vgg6, vgg16, generic')
   parser.add_argument('-p', '--pool', default=0, type=int, help='initial pooling width')
   parser.add_argument('-l', '--load', default=None,type=str, help='name of saved weights to load')
-  parser.add_argument('-e', '--epochs', default='100',type=int, help='epochs to train model for')
+  parser.add_argument('-e', '--epochs', default=10,type=int, help='epochs to train model for')
   parser.add_argument('-s', '--save', default='model',type=str, help='name to save model as')
   parser.add_argument('-d', '--imagedir', default=os.getcwd(),type=str, help='directory where PNG images are stored')
+  parser.add_argument('-a', '--attack', default='fgsm',type=str, help='type of attack image to load')
+
   args = parser.parse_args()
   return args
 
@@ -66,17 +68,13 @@ def clf(outputs, model=False):
 
     return top_model
 
-def ft():
+def load_new_data(args):
 
 
-    config = tf.ConfigProto()
-    config.gpu_options.per_process_gpu_memory_fraction = 0.5
-    keras.backend.set_session(tf.Session(config=config))
-
-    args = load_args()
     filelist = glob.glob(args.imagedir+'/*.png')
 
-    npy_dir = os.getcwd()+'/npy/'+args.model+str(args.pool)+'.npy'
+    npy_dir = os.getcwd()+'/npy/'+args.model+str(args.pool)+'_'+args.attack+'.npy'
+
     if not os.path.exists(npy_dir):
         print "==> numpy image archive doesn't exist\nCreating ..."
         x = np.array([np.array(Image.open(fname)) for fname in filelist])
@@ -85,27 +83,51 @@ def ft():
         print "==> loading numpy image archive"
         x = np.load(npy_dir)
 
+    size_train = int(x.shape[0]*0.8)
+    size_val = int(x.shape[0]*0.2)
     print "size of adversarial set: {}".format(x.shape)
-    y = np.zeros(40000)
-    y_test = np.zeros(10000)
-    Y1 = np.ones(50000)
-    Y2 = np.ones(10000)
-    X, Y, X_test, Y_test = data_cifar10()
-    x_test = x[:10000]
-    x = x[10000:]
+    X_train, Y_train, X_test, Y_test = data_cifar10()
 
-    X_train = np.concatenate((X, x))
-    Y_train = np.concatenate((Y1, y))
-    Y_test  = np.concatenate((Y2, y_test))
-    X_test  = np.concatenate((X_test, x_test))
+    y_adv_train = np.zeros(size_train)
+    y_train = np.ones(size_train)
+
+    y_adv_test = np.zeros(size_val)
+    y_test = np.ones(size_val)
+
+    x_adv_test  = x[:size_val]
+    x_adv_train = x[size_val:]
+
+    x_test  = X_test[:size_val]
+    x_train = X_train[:size_train]
+
+    X_train = np.concatenate((x_train, x_adv_train))
+    Y_train = np.concatenate((y_train, y_adv_train))
+    Y_test  = np.concatenate((y_test, y_adv_test))
+    X_test  = np.concatenate((x_test, x_adv_test))
+
 
     Y_train = np_utils.to_categorical(Y_train, 2)
     Y_test = np_utils.to_categorical(Y_test, 2)
 
-    print X_train.shape
-    print Y_train.shape
-    print X_test.shape
-    print Y_test.shape
+    print "\n==> configured data into\n"
+    print "training data shape:   ", X_train.shape
+    print "training labels shape: ", Y_train.shape
+    print "testing data shape:    ", X_test.shape
+    print "testing labels shape   ", Y_test.shape
+
+    return X_train, Y_train, X_test, Y_test
+
+def ft():
+
+
+    config = tf.ConfigProto()
+    config.gpu_options.per_process_gpu_memory_fraction = 0.3
+    keras.backend.set_session(tf.Session(config=config))
+
+    args = load_args()
+
+    X_train, Y_train, X_test, Y_test = load_new_data(args)
+
     if not hasattr(backend, "tf"):
         raise RuntimeError("This tutorial requires keras to be configured"
                            " to use the TensorFlow backend.")
@@ -135,9 +157,6 @@ def ft():
 
     classifier = clf(2, model=False)
 
-
-    model.summary()
-
     for layer in classifier:
 	model.add(layer)
     model.summary()
@@ -147,12 +166,12 @@ def ft():
 		  metrics=['accuracy'])
 
     model.fit(X_train, Y_train,
-	      epochs=10,
+	      epochs=args.epochs,
 	      batch_size=128,
               shuffle=True,
 	      validation_data=(X_test, Y_test))
 
-    result_dir = os.getcwd()+'/models/detectors/'
+    result_dir = os.getcwd()+'/ckpts/detectors/'+args.attack+'/'
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
 
