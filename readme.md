@@ -1,8 +1,28 @@
 ## Adversarial toolbox
 
-Toolkit for working with adversarial images using Keras and Cleverhans
-
 ### WIP
+
+Simply, this toolbox offers high level toolbox to generate and work with adversarial images on deep neural networks. 
+Adversarial examples can be a pain to generate, with most implementations being in disparate frameworks, using different parameters. Here we consolidate some of that into an easy to use and setup testing setup. 
+
+
+### Setting up the toolbox
+
+This project uses the standard libraries needed for most ML projects. The main routines are built on `Keras` with
+a `Tensorflow` backend. Theano implementations of the attacks are not explicitly included, but they would be easy to add. In addition, you also need the below libraries
+* numpy
+* scipy
+* matplotlib
+* pillow
+
+Or install everything with ```python python -r requirements.txt```
+
+This toolbox relies heavily on [Cleverhans](https://github.com/openai/cleverhans/) so the library is included at the current master version to make CI easier. 
+
+
+### Train Base Keras CNN
+
+
 
 ### Generate images
 
