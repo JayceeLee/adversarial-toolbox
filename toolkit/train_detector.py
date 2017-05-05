@@ -83,10 +83,19 @@ def load_new_data(args):
         print "==> loading numpy image archive"
         x = np.load(npy_dir)
 
-    size_train = int(x.shape[0]*0.8)
-    size_val = int(x.shape[0]*0.2)
+    X_train, _, X_test, _ = data_cifar10()
+
+    # we want to partition dataset equally, according to the smaller set
+    # ex. 5000 jsma images + 5000 cifar original images. Instead of 5k+50k
+    max_size = min(x.shape[0], X_train.shape[0])
+    size_train = int(max_size*0.8)
+    size_val = int(max_size*0.2)
+
+    # shuffle everything. This is ok because labels are binary
+    np.random.shuffle(x)
+    np.random.shuffle(X_train)
+    np.random.shuffle(X_test)
     print "size of adversarial set: {}".format(x.shape)
-    X_train, Y_train, X_test, Y_test = data_cifar10()
 
     y_adv_train = np.zeros(size_train)
     y_train = np.ones(size_train)

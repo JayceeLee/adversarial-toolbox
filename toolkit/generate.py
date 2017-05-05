@@ -99,9 +99,9 @@ def generate_images():
 
 
     # Create TF session and set as Keras backend session
-    config = tf.ConfigProto()
+    config = tf.configproto()
     config.gpu_options.per_process_gpu_memory_fraction = 0.3
-    sess = tf.Session(config=config)
+    sess = tf.session(config=config)
     keras.backend.set_session(sess)
 
     print "==> Beginning Session"

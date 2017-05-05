@@ -16,7 +16,7 @@ from keras.regularizers import l2
 from keras import backend as K
 
 
-def generic(img_rows=32, img_cols=32, channels=3, top=False, pool=0):
+def generic(img_rows=32, img_cols=32, channels=3, top=False, ft=False, pool=0):
 
     model = Sequential()
 
@@ -65,6 +65,13 @@ def generic(img_rows=32, img_cols=32, channels=3, top=False, pool=0):
         model.add(Activation('relu'))
         model.add(Dropout(0.5))
         model.add(Dense(10, activation='softmax'))
+
+    if ft:
+
+        model.add(Flatten())
+        model.add(Dense(256, activation='relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(2, activation='softmax'))
 
     return model
 
