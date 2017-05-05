@@ -101,10 +101,14 @@ cifar-10-batches-py/
 npy/
 box/
 ckpts/
+figures/
+samples/
 
 *.sh
 *.net
 *.gz
 *.swp
 *.swo
-
+*.pkl
+*.pkl
+*.jpg
