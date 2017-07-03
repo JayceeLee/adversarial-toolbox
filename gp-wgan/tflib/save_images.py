@@ -7,7 +7,7 @@ import scipy.misc
 from scipy.misc import imsave
 import matplotlib.pyplot as plt
 
-def save_images(X, save_path, individual=False):
+def save_images(X, save_path, save_dir, individual=False):
     # [0, 1] -> [0,255]
     if isinstance(X.flatten()[0], np.floating):
         X = (255.99*X).astype('uint8')
@@ -15,7 +15,7 @@ def save_images(X, save_path, individual=False):
     n_samples = X.shape[0]
     rows = int(np.sqrt(n_samples))
 
-    result_dir = os.getcwd()+'/samples/cifar10/composite/pool2_no_inter_pool/'
+    result_dir = os.getcwd()+'/samples/cifar10/d2/detector/'+save_dir+'/'
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
 

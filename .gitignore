@@ -112,3 +112,7 @@ samples/
 *.pkl
 *.pkl
 *.jpg
+*.meta
+*.index
+*.data-00000-of-00001
+*checkpoint

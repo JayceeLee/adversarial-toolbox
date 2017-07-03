@@ -21,6 +21,7 @@ from keras.utils import np_utils
 from keras.layers.core import Activation, Dense, Flatten, Dropout
 from PIL import Image
 import matplotlib.pyplot as plt
+from sklearn.utils import shuffle
 
 def load_args():
 
@@ -63,7 +64,7 @@ def clf(outputs, model=False):
 	        Flatten(),
 		Dense(256, activation='relu'),
 		Dropout(0.5),
-		Dense(outputs, activation='softmax'),
+		Dense(1, activation='sigmoid'),
 	]
 
     return top_model
@@ -103,6 +104,7 @@ def load_new_data(args):
     y_adv_test = np.zeros(size_val)
     y_test = np.ones(size_val)
 
+
     x_adv_test  = x[:size_val]
     x_adv_train = x[size_val:]
 
@@ -114,9 +116,12 @@ def load_new_data(args):
     Y_test  = np.concatenate((y_test, y_adv_test))
     X_test  = np.concatenate((x_test, x_adv_test))
 
+    X_train, Y_train = shuffle(X_train, Y_train)
+    X_test, Y_test = shuffle(X_test, Y_test)
 
-    Y_train = np_utils.to_categorical(Y_train, 2)
-    Y_test = np_utils.to_categorical(Y_test, 2)
+    print Y_test
+    #Y_train = np_utils.to_categorical(Y_train, 2)
+    #Y_test = np_utils.to_categorical(Y_test, 2)
 
     print "\n==> configured data into\n"
     print "training data shape:   ", X_train.shape
@@ -171,7 +176,7 @@ def ft():
     model.summary()
 
     model.compile(optimizer='adam',
-		  loss='categorical_crossentropy',
+		  loss='binary_crossentropy',
 		  metrics=['accuracy'])
 
     model.fit(X_train, Y_train,
@@ -180,7 +185,7 @@ def ft():
               shuffle=True,
 	      validation_data=(X_test, Y_test))
 
-    result_dir = os.getcwd()+'/ckpts/detectors/'+args.attack+'/'
+    result_dir = os.getcwd()+'/ckpts/detectors/sigmoid_'+args.attack+'/'
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
 
