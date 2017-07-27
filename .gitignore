@@ -119,3 +119,4 @@ images/
 *.t7
 *.JPEG
 board/
+cycleGAN/
