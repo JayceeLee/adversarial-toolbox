@@ -8,6 +8,8 @@ import tensorflow as tf
 import keras.backend as K
 import scipy.misc
 from PIL import Image
+from scipy.misc import imread
+from glob import glob
 
 from models import resnet
 from models.vgg6 import vggbn
@@ -42,7 +44,7 @@ flags.DEFINE_integer('img_cols', 32, 'Input column dimension')
 flags.DEFINE_integer('nb_channels', 3, 'Nb of color channels in the input.')
 flags.DEFINE_integer('nb_filters', 64, 'Number of convolutional filter to use')
 flags.DEFINE_integer('nb_pool', 2, 'Size of pooling area for max pooling')
-flags.DEFINE_integer('source_samples', 1000, 'Nb of test set examples to attack')
+flags.DEFINE_integer('source_samples', 50000, 'Nb of test set examples to attack')
 
 def load_args():
 
@@ -84,6 +86,43 @@ def data_cifar10():
     Y_test = np_utils.to_categorical(y_test, nb_classes)
     return X_train, Y_train, X_test, Y_test
 
+def gan_cifar10():
+
+    # These values are specific to CIFAR10
+    img_rows = 32
+    img_cols = 32
+    X = []
+    # the data, shuffled and split between train and test sets
+    images = glob('/home/neale/repos/adversarial-toolbox/gp-wgan/rand_grid_images/*.png')
+    for image in images:
+        X.append(imread(image))
+    X = np.array(X)
+    print X.shape
+    X_train = X[:int(.8*len(X))]
+    X_test = X[int(.8*len(X)):]
+
+    Y = np.ones(len(X))
+    Y_train = Y[:int(.8*len(Y))]
+    Y_test = Y[int(.8*len(Y)):]
+
+    if keras.backend.image_dim_ordering() == 'th':
+        X_train = X_train.reshape(X_train.shape[0], 3, img_rows, img_cols)
+        X_test = X_test.reshape(X_test.shape[0], 3, img_rows, img_cols)
+    else:
+        X_train = X_train.reshape(X_train.shape[0], img_rows, img_cols, 3)
+        X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols, 3)
+
+    X_train = X_train.astype('float32')
+    X_test = X_test.astype('float32')
+    X_train /= 255
+    X_test /= 255
+    print('X_train shape:', X_train.shape)
+    print(X_train.shape[0], 'train samples')
+    print(X_test.shape[0], 'test samples')
+
+    # convert class vectors to binary class matrices
+    return X_train, Y_train, X_test, Y_test
+
 def generate_images():
 
     print('==> Preparing data..')
@@ -99,9 +138,9 @@ def generate_images():
 
 
     # Create TF session and set as Keras backend session
-    config = tf.configproto()
-    config.gpu_options.per_process_gpu_memory_fraction = 0.3
-    sess = tf.session(config=config)
+    config = tf.ConfigProto()
+    config.gpu_options.per_process_gpu_memory_fraction = 0.5
+    sess = tf.Session(config=config)
     keras.backend.set_session(sess)
 
     print "==> Beginning Session"
@@ -174,7 +213,7 @@ def generate_images():
     """ JSMA """
     if args.attack == 'jsma' or args.attack == 'JSMA':
 
-        result_dir = os.getcwd()+'/images/jsma/'
+        result_dir = os.getcwd()+'/images/jsma/trial_single_adv'
 	print('Crafting ' + str(FLAGS.source_samples) + ' * ' +
 	      str(FLAGS.nb_classes-1) + ' adversarial examples')
 
@@ -198,19 +237,19 @@ def generate_images():
         n_image = 0
 	# Loop over the samples we want to perturb into adversarial examples
 	print "==> saving images to {}".format(result_dir+model_name)
-	for sample_ind in xrange(0, FLAGS.source_samples):
+	for sample_ind in xrange(7166, FLAGS.source_samples):
 	    # We want to find an adversarial example for each possible target class
-	    current_class = int(np.argmax(Y_test[sample_ind]))
+	    current_class = int(np.argmax(Y_train[sample_ind]))
 	    target_classes = other_classes(FLAGS.nb_classes, current_class)
 	    # For the grid visualization, keep original images along the diagonal
 	    grid_viz_data[current_class, current_class, :, :, :] = np.reshape(
-		    X_test[sample_ind:(sample_ind+1)],
+		    X_train[sample_ind:(sample_ind+1)],
 		    (FLAGS.img_rows, FLAGS.img_cols, FLAGS.nb_channels))
 
 	    # Loop over all target classes
 	    adversarials = []
 	    for idx, target in enumerate(target_classes):
-                print "image {}".format(n_image)
+                print "image {}".format(sample_ind)
 
 		# here we hold all successful adversarials for this iteration
 		# since we dont want 500k images, we will uniformly sample an image to save after each target
@@ -220,15 +259,14 @@ def generate_images():
 
 		# This call runs the Jacobian-based saliency map approach
 		adv_x, res, percent_perturb = jsma(sess, x, predictions, grads,
-						   X_test[sample_ind:
+						   X_train[sample_ind:
 							  (sample_ind+1)],
 						   target, theta=1, gamma=0.1,
 						   increase=True, back='tf',
 						   clip_min=0, clip_max=1)
-
 		# Display the original and adversarial images side-by-side
                 adversarial = np.reshape(adv_x, (FLAGS.img_rows, FLAGS.img_cols, FLAGS.nb_channels))
-		original = np.reshape(X_test[sample_ind:(sample_ind+1)],
+		original = np.reshape(X_train[sample_ind:(sample_ind+1)],
 					 (FLAGS.img_rows, FLAGS.img_cols, FLAGS.nb_channels))
 
 		if FLAGS.viz_enabled:
@@ -241,17 +279,24 @@ def generate_images():
                 if not os.path.exists(result_dir+model_name):
                     os.makedirs(result_dir+model_name)
 
-		adversarials.append(adversarial)
+                if res == 1:
+		    adversarials.append(adversarial)
 
                 if idx == FLAGS.nb_classes-2:
 
-                    idx_uniform = np.random.randint(0, 9, size=5)
-                    pruned_list = [adversarials[i] for i in idx_uniform]
-                    for adv in pruned_list:
-                        scipy.misc.imsave(result_dir+model_name+im_base+str(i_saved)+'.png', adversarial)
+                    try:
+                        if len(adversarials) == 1:
+                            idx_uniform = 0
+                        else:
+                            idx_uniform = np.random.randint(0, len(adversarials)-1)
+                        print idx_uniform
+                        scipy.misc.imsave(result_dir+model_name+im_base+str(sample_ind)+'.png', adversarials[idx_uniform])
                         i_saved += 1
-                    print "==> images saved: {}".format(i_saved)
+                        print "==> images saved: {}".format(i_saved)
 
+                    except:
+
+                        print "No adversarials generated"
 
 		# Add our adversarial example to our grid data
 		grid_viz_data[target, current_class, :, :, :] = np.reshape(

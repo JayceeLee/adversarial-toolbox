@@ -7,17 +7,20 @@ import time
 import numpy as np
 import tensorflow as tf
 import matplotlib
-
+import functools
 matplotlib.use('pdf')
 from skimage import color
 from scipy.ndimage import filters
-
+import sklearn.datasets
 import tflib as lib
 import tflib.ops.linear
 import tflib.ops.conv2d
 import tflib.ops.batchnorm
 import tflib.ops.deconv2d
+import tflib.small_imagenet
+import tflib.cub128
 import tflib.cifar10
+import tflib.ops.layernorm
 import tflib.save_images
 import tflib.inception_score
 import tflib.plot
@@ -30,20 +33,20 @@ from keras.layers.core import Flatten, Dense, Dropout
 from sklearn.utils import shuffle
 from genericnet import generic
 import argparse
-DATA_DIR = os.getcwd()+'/../toolkit/cifar-10-batches-py'
+DATA_DIR = '/home/neale/repos/adversarial-toolbox/images/cub128'
 
 MODE = 'wgan-gp' # Valid options are dcgan, wgan, or wgan-gp
-DIM = 128 # This overfits substantially; you're probably better off with 64
+DIM = 64 # This overfits substantially; you're probably better off with 64
 LAMBDA = 10 # Gradient penalty lambda hyperparameter
 CRITIC_ITERS = 5 # How many critic iterations per generator iteration
 GEN_ITERS = 1 # how many generator iterations per disc iteration (old DCGAN hack)
-BATCH_SIZE = 32 # Batch size
-BATCH_SIZE_ADV = 32 # Batch size
-ITERS = 100000 # How many generator iterations to train for
-OUTPUT_DIM = 3072 # Number of pixels in CIFAR10 (3*32*32)
-D2_START_ITERS = 50000
+BATCH_SIZE = 4 # Batch size
+BATCH_SIZE_ADV = 4 # Batch size
+ITERS = 300000 # How many generator iterations to train for
+OUTPUT_DIM = 49152 # Number of pixels in CIFAR10 (3*32*32)
+D2_START_ITERS = 300000
 SAVE_ITERS = [1, 10000, 20000, 50000, 100000]
-SAVE_NAME = "vanilla_wgan-gp"
+SAVE_NAME = "128_wgan-gp"
 lib.print_model_settings(locals().copy())
 
 def load_args():
@@ -106,51 +109,121 @@ def LeakyReLULayer(name, n_in, n_out, inputs):
 def MaxPool(input, size, stride, padding):
     output = tf.nn.max_pool(input, size, stride, padding, data_format='NCHW')
     return output
+def pixcnn_gated_nonlinearity(a, b):
+    return tf.sigmoid(a) * tf.tanh(b)
 
-def G(n_samples, noise=None):
+def SubpixelConv2D(*args, **kwargs):
+    kwargs['output_dim'] = 4*kwargs['output_dim']
+    output = lib.ops.conv2d.Conv2D(*args, **kwargs)
+    output = tf.transpose(output, [0,2,3,1])
+    output = tf.depth_to_space(output, 2)
+    output = tf.transpose(output, [0,3,1,2])
+    return output
+def Batchnorm(name, axes, inputs):
+    if ('Discriminator' in name) and (MODE == 'wgan-gp'):
+        if axes != [0,2,3]:
+            raise Exception('Layernorm over non-standard axes is unsupported')
+        return lib.ops.layernorm.Layernorm(name,[1,2,3],inputs)
+    else:
+        return lib.ops.batchnorm.Batchnorm(name,axes,inputs,fused=True)
 
+def ResidualBlock(name, input_dim, output_dim, filter_size, inputs, resample=None, he_init=True):
+    """
+    resample: None, 'down', or 'up'
+    """
+    if resample=='down':
+        conv_shortcut = functools.partial(lib.ops.conv2d.Conv2D, stride=2)
+        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim, output_dim=input_dim/2)
+        conv_1b       = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim/2, output_dim=output_dim/2, stride=2)
+        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=output_dim/2, output_dim=output_dim)
+    elif resample=='up':
+        conv_shortcut = SubpixelConv2D
+        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim, output_dim=input_dim/2)
+        conv_1b       = functools.partial(lib.ops.deconv2d.Deconv2D, input_dim=input_dim/2, output_dim=output_dim/2)
+        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=output_dim/2, output_dim=output_dim)
+    elif resample==None:
+        conv_shortcut = lib.ops.conv2d.Conv2D
+        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim,  output_dim=input_dim/2)
+        conv_1b       = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim/2,  output_dim=output_dim/2)
+        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim/2, output_dim=output_dim)
+
+    else:
+        raise Exception('invalid resample value')
+
+    if output_dim==input_dim and resample==None:
+        shortcut = inputs # Identity skip-connection
+    else:
+        shortcut = conv_shortcut(name+'.Shortcut', input_dim=input_dim, output_dim=output_dim, filter_size=1,
+                                 he_init=False, biases=True, inputs=inputs)
+
+    output = inputs
+    output = tf.nn.relu(output)
+    output = conv_1(name+'.Conv1', filter_size=1, inputs=output, he_init=he_init, weightnorm=False)
+    output = tf.nn.relu(output)
+    output = conv_1b(name+'.Conv1B', filter_size=filter_size, inputs=output, he_init=he_init, weightnorm=False)
+    output = tf.nn.relu(output)
+    output = conv_2(name+'.Conv2', filter_size=1, inputs=output, he_init=he_init, weightnorm=False, biases=False)
+    output = Batchnorm(name+'.BN', [0,2,3], output)
+
+    return shortcut + (0.3*output)
+base_d = False
+
+def G(n_samples, noise=None, dim=DIM):
     if noise is None:
-        noise = tf.random_normal([n_samples, args.z])
+        noise = tf.random_normal([n_samples, 128])
 
-    output = lib.ops.linear.Linear('G.Input', args.z, 4*4*4*DIM, noise)
-    output = lib.ops.batchnorm.Batchnorm('G.BN1', [0], output)
-    output = tf.nn.relu(output)
-    output = tf.reshape(output, [-1, 4*DIM, 4, 4])
+    output = lib.ops.linear.Linear('Generator.Input', 128, 4*4*16*dim, noise)
+    output = tf.reshape(output, [-1, 16*dim, 4, 4])
 
-    output = lib.ops.deconv2d.Deconv2D('G.2', 4*DIM, 2*DIM, 5, output)
-    output = lib.ops.batchnorm.Batchnorm('G.BN2', [0,2,3], output)
-    output = tf.nn.relu(output)
+    for i in xrange(6):
+        output = ResidualBlock('Generator.4x4_{}'.format(i), 16*dim, 16*dim, 3, output, resample=None)
+    output = ResidualBlock('Generator.Up1', 16*dim, 8*dim, 3, output, resample='up')
+    for i in xrange(6):
+        output = ResidualBlock('Generator.8x8_{}'.format(i), 8*dim, 8*dim, 3, output, resample=None)
+    output = ResidualBlock('Generator.Up2', 8*dim, 4*dim, 3, output, resample='up')
+    for i in xrange(6):
+        output = ResidualBlock('Generator.16x16_{}'.format(i), 4*dim, 4*dim, 3, output, resample=None)
+    output = ResidualBlock('Generator.Up3', 4*dim, 2*dim, 3, output, resample='up')
+    for i in xrange(6):
+        output = ResidualBlock('Generator.32x32_{}'.format(i), 2*dim, 2*dim, 3, output, resample=None)
+    output = ResidualBlock('Generator.Up4', 2*dim, 1*dim, 3, output, resample='up')
+    for i in xrange(5):
+        output = ResidualBlock('Generator.64x64_{}'.format(i), 1*dim, 1*dim, 3, output, resample=None)
+    output = ResidualBlock('Generator.Up5', 1*dim, dim/2, 3, output, resample='up')
+    for i in xrange(5):
+        output = ResidualBlock('Generator.128x128_{}'.format(i), dim/2, dim/2, 3, output, resample=None)
 
-    output = lib.ops.deconv2d.Deconv2D('G.3', 2*DIM, DIM, 5, output)
-    output = lib.ops.batchnorm.Batchnorm('G.BN3', [0,2,3], output)
-    output = tf.nn.relu(output)
-
-    output = lib.ops.deconv2d.Deconv2D('G.5', DIM, 3, 5, output)
-
-    output = tf.tanh(output)
+    output = lib.ops.conv2d.Conv2D('Generator.Out', dim/2, 3, 1, output, he_init=False)
+    output = tf.tanh(output / 5.)
 
     return tf.reshape(output, [-1, OUTPUT_DIM])
 
-base_d = False
 
-def D1(inputs):
-    output = tf.reshape(inputs, [-1, 3, 32, 32])
+# ! Discriminators
 
-    output = lib.ops.conv2d.Conv2D('D1.1', 3, DIM, 5, output, stride=2)
-    output = LeakyReLU(output)
+def D1(inputs, dim=DIM):
+    output = tf.reshape(inputs, [-1, 3, 128, 128])
+    output = lib.ops.conv2d.Conv2D('Discriminator.In', 3, dim/2, 1, output, he_init=False)
 
-    output = lib.ops.conv2d.Conv2D('D1.2', DIM, 2*DIM, 5, output, stride=2)
-    output = LeakyReLU(output)
+    for i in xrange(5):
+        output = ResidualBlock('Discriminator.64x64_{}'.format(i), dim/2, dim/2, 3, output, resample=None)
+    output = ResidualBlock('Discriminator.Down1', dim/2, dim*1, 3, output, resample='down')
+    for i in xrange(6):
+        output = ResidualBlock('Discriminator.32x32_{}'.format(i), dim*1, dim*1, 3, output, resample=None)
+    output = ResidualBlock('Discriminator.Down2', dim*1, dim*2, 3, output, resample='down')
+    for i in xrange(6):
+        output = ResidualBlock('Discriminator.16x16_{}'.format(i), dim*2, dim*2, 3, output, resample=None)
+    output = ResidualBlock('Discriminator.Down3', dim*2, dim*4, 3, output, resample='down')
+    for i in xrange(6):
+        output = ResidualBlock('Discriminator.8x8_{}'.format(i), dim*4, dim*4, 3, output, resample=None)
+    output = ResidualBlock('Discriminator.Down4', dim*4, dim*8, 3, output, resample='down')
+    for i in xrange(6):
+        output = ResidualBlock('Discriminator.4x4_{}'.format(i), dim*8, dim*8, 3, output, resample=None)
 
-    output = lib.ops.conv2d.Conv2D('D1.3', 2*DIM, 4*DIM, 5, output, stride=2)
-    output = LeakyReLU(output)
+    output = tf.reshape(output, [-1, 4*4*8*dim])
+    output = lib.ops.linear.Linear('Discriminator.Output', 4*4*8*dim, 1, output)
 
-    # we relax the dimensionality constraint here. Make it big
-    output = tf.reshape(output, [-1, 4*4*4*DIM])
-    output = lib.ops.linear.Linear('D1.Output', 4*4*4*DIM, 1, output)
-
-    #print "d1 ", tf.reshape(output, [-1]).shape
-    return tf.reshape(output, [-1])
+    return tf.reshape(output / 5., [-1])
 
 def D2(inputs):
     """
@@ -159,7 +232,7 @@ def D2(inputs):
     discriminator into thinking that I ~ P(x), and we also need to fool the binary
     detector into thinking that this new adversarial image comes from the natural manifold
     """
-    inputs = tf.reshape(inputs, [-1, 32, 32, 3])
+    inputs = tf.reshape(inputs, [-1, 128, 128, 3])
     d2 = detector(inputs)
     detector.summary()
     d2 = tf.reshape(d2, [-1])
@@ -168,10 +241,10 @@ def D2(inputs):
 # calculate image gradient magnitudes and plot histogram
 
 """ Here we grab samples from G and push them through D1 and D2 """
-real_data_int = tf.placeholder(tf.int32, shape=[BATCH_SIZE*2, OUTPUT_DIM])
-real_data = 2*((tf.cast(real_data_int, tf.float32)/255.)-.5)
+real_data_int = tf.placeholder(tf.int32, shape=[BATCH_SIZE*2, 3, 128, 128])
+real_data_reshape = tf.reshape(real_data_int, [BATCH_SIZE*2, OUTPUT_DIM])
+real_data = 2*((tf.cast(real_data_reshape, tf.float32)/255.)-.5)
 gen_data = G(BATCH_SIZE*2)
-y = tf.placeholder(tf.float32, shape=[BATCH_SIZE*2])
 train_d2 = tf.placeholder(tf.int32)
 test_summ = tf.placeholder(tf.int32)
 """
@@ -180,8 +253,9 @@ We constrain our manifold to only include images from the union on sets P1 and P
 P1 being the set of natural images that could come from Cifar
 P2 being the set of adversarial images that can fool our detector
 """
-disc_nat  = D2(real_data)
-disc_adv  = D2(gen_data)
+#disc_nat  = D2(real_data)
+#disc_adv  = D2(gen_data)
+disc_adv  = 1.
 
 disc_real = D1(tf.identity(real_data))
 disc_fake = D1(gen_data)
@@ -194,8 +268,8 @@ disc_fake = tf.Print(disc_fake, [disc_fake], "FAKE: ")
 disc_nat = tf.Print(disc_nat, [disc_nat], "NAT: ")
 disc_adv = tf.Print(disc_adv, [disc_adv], "ADV: ")
 """
-g_params = lib.params_with_name('G')
-d1_params = lib.params_with_name('D1')
+g_params = lib.params_with_name('Generator')
+d1_params = lib.params_with_name('Discriminator')
 #d2_params = lib.params_with_name('D2')
 
 # Standard WGAN loss on G and first discriminator
@@ -204,8 +278,7 @@ d1_params = lib.params_with_name('D1')
 
 gen_cost = tf.cond(train_d2 > 0, lambda: -tf.reduce_mean(disc_fake)-tf.reduce_mean(disc_adv),
                                  lambda: -tf.reduce_mean(disc_fake))
-d2_cost = tf.cond(train_d2 > 0,  lambda: tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_adv, labels=y)),
-                                 lambda: 0.)
+
 d1_cost  =  tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
 
 """ Gradient penalty """
@@ -218,6 +291,7 @@ alpha = tf.random_uniform(
     maxval=1.
 )
 # calculate two sided loss term, mean( sqrt( sum ( gradx^2 ) ) )
+print gen_data.shape
 differences = gen_data - real_data
 interpolates = real_data + (alpha*differences)
 
@@ -231,18 +305,19 @@ gradient_penalty = tf.reduce_mean((slopes-1.)**2)
 d1_cost += LAMBDA*gradient_penalty
 
 gen_train_op = tf.train.AdamOptimizer(learning_rate=1e-4, beta1=0.5, beta2=0.9).minimize(
-                                      gen_cost, var_list=g_params
+                                      gen_cost, var_list=g_params, colocate_gradients_with_ops=True
                                      )
 d1_train_op = tf.train.AdamOptimizer(learning_rate=1e-4, beta1=0.5, beta2=0.9).minimize(
-                                       d1_cost, var_list=d1_params
+                                       d1_cost, var_list=d1_params, colocate_gradients_with_ops=True
                                      )
 
 # we dont want to train the detector, just load weights
-d2_train_op = tf.train.AdamOptimizer(learning_rate=1e-4, beta1=0.5, beta2=0.9).minimize(
-                                       d2_cost#, var_list=d2_params
-                                     )
+"""d2_train_op = tf.train.AdamOptimizer(learning_rate=1e-4, beta1=0.5, beta2=0.9).minimize(
+                                       d2_cost, colocate_gradients_with_ops=True#, var_list=d2_params
+                                    )
+"""
 d1_summ  = tf.summary.scalar("d1 cost", d1_cost)
-d2_summ  = tf.summary.scalar("d2 cost", d2_cost)
+#d2_summ  = tf.summary.scalar("d2 cost", d2_cost)
 gen_summ = tf.summary.scalar("gen cost", gen_cost)
 
 fixed_noise_z = tf.constant(np.random.normal(size=(args.z, args.z)).astype('float32'))
@@ -253,18 +328,18 @@ def generate_random_image(frame,  save, board=False):
     random_noise_samples_z = G(args.z, noise=random_noise_z)
     samples = session.run(random_noise_samples_z)
     samples = ((samples+1.)*(255./2)).astype('int32')
-    lib.save_images.save_images(samples.reshape((args.z, 3, 32, 32)), 'samples_{}'.format(frame), save, individual=False)
+    lib.save_images.save_images(samples.reshape((args.z, 3, 128, 128)), 'samples_{}'.format(frame), save, individual=False)
 
 
 def generate_image(frame, true_dist, save, board=False):
     samples = session.run(fixed_noise_samples_z)
     samples = ((samples+1.)*(255./2)).astype('int32')
-    lib.save_images.save_images(samples.reshape((args.z, 3, 32, 32)), 'samples_{}'.format(frame), args.save_dir, individual=False)
+    lib.save_images.save_images(samples.reshape((args.z, 3, 128, 128)), 'samples_{}'.format(frame), args.save_dir, individual=False)
 
 def generate_image_tf(frame, true_dist, save):
     samples = session.run(fixed_noise_samples_z)
     samples = ((samples+1.)*(255./2)).astype('int32')
-    return lib.save_images.save_images(samples.reshape((args.z, 3, 32, 32)), 'samples_{}'.format(frame), args.save_dir, individual=False, board=True)
+    return lib.save_images.save_images(samples.reshape((args.z, 3, 128, 128)), 'samples_{}'.format(frame), args.save_dir, individual=False, board=True)
 
 def image_grad(image, hist_name):
 
@@ -272,7 +347,7 @@ def image_grad(image, hist_name):
     print image.shape
     gmag = []
     for i in range(image.shape[0]):
-        im = tf.reshape(image[i], [32, 32, 3])
+        im = tf.reshape(image[i], [128, 128, 3])
         print im.shape
         im = im.eval()
         print im.shape
@@ -305,7 +380,7 @@ def get_inception_score():
         all_samples.append(session.run(samples_100))
     all_samples = np.concatenate(all_samples, axis=0)
     all_samples = ((all_samples+1.)*(255./2)).astype('int32')
-    all_samples = all_samples.reshape((-1, 3, 32, 32)).transpose(0,2,3,1)
+    all_samples = all_samples.reshape((-1, 3, 128, 128)).transpose(0,2,3,1)
     return lib.inception_score.get_inception_score(list(all_samples))
 
 # Adversarial dataset generators
@@ -316,8 +391,8 @@ def adv_gen(x, batch_size):
         np.random.shuffle(x)
         for i in xrange(len(x) / batch_size):
             feed = x[i*batch_size:(i+1)*batch_size]
-            feed = np.reshape(feed, (-1, 3072))
-            yield (np.copy(feed), np.zeros(batch_size))
+            feed = np.reshape(feed, (-1, 49152))
+            yield (np.copy(feed))
 
     return get_epoch
 
@@ -328,23 +403,25 @@ def adv_load(x, batch_size):
 train_gen_adv, dev_gen_adv = adv_load(x, BATCH_SIZE)
 
 # Vanilla Cifar generators
-train_gen1, dev_gen1 = lib.cifar10.load(BATCH_SIZE*2, data_dir=DATA_DIR)
-train_gen2, dev_gen2 = lib.cifar10.load(BATCH_SIZE, data_dir=DATA_DIR)
+train_gen1, dev_gen1 = lib.cub128.load_cub128(BATCH_SIZE*2, data_dir=DATA_DIR)
+train_gen2, dev_gen2 = lib.cub128.load_cub128(BATCH_SIZE, data_dir=DATA_DIR)
+#train_gen1, dev_gen1 = lib.cifar10.load(BATCH_SIZE*2, data_dir=DATA_DIR)
+#train_gen2, dev_gen2 = lib.cifar10.load(BATCH_SIZE, data_dir=DATA_DIR)
 
 def inf_train_gen1():
     while True:
-        for images, targets in train_gen1():
-            yield (images, targets)
+        for images in train_gen1():
+            yield (images)
 
 def inf_train_gen2():
     while True:
-        for images, targets in train_gen2():
-            yield (images, targets)
+        for images in train_gen2():
+            yield (images)
 
 def inf_train_gen_adv():
     while True:
-        for images, targets in train_gen_adv():
-            yield (images, targets)
+        for images, in train_gen_adv():
+            yield (images)
 
 # Train loop
 
@@ -353,11 +430,6 @@ config.gpu_options.per_process_gpu_memory_fraction = 0.9
 d2 = InitD2()
 args = load_args()
 summaries_dir = './board'
-for grad, var in grads:
-        tf.summary.histogram(var.name + '/gradient', grad)
-for var in tf.trainable_variables():
-        tf.summary.histogram(var.name, var)
-
 summary_op = tf.summary.merge_all()
 
 print args.save_dir
@@ -375,12 +447,12 @@ with tf.Session(config=config) as session:
     d2_start = D2_START_ITERS
     saver = tf.train.Saver()
     #saver = tf.train.import_meta_graph('./models/vanilla_wgan-gp_20000_steps.meta')
-    saver.restore(session, './models/vanilla_wgan-gp_50000_steps')
-
+    #saver.restore(session, './models/vanilla_wgan-gp_50000_steps')
+    """
     for iteration in range(500):
         generate_random_image(iteration, args.save_dir)
-
-    for iteration in xrange(20000, ITERS):
+    """
+    for iteration in xrange(ITERS):
         start_time = time.time()
         # Train generator
         if iteration > 0:
@@ -393,25 +465,18 @@ with tf.Session(config=config) as session:
         for i in xrange(disc_iters):
             # second phase, we have trained G and D1, now train including D2
             if iteration < d2_start:
-                _data, _labels = gen1.next()
-                _d1_cost, _ = session.run([d1_cost, d1_train_op], feed_dict={real_data_int: _data,
-                                                                                                  y: _labels,
-                                                                                                  train_d2: 0 })
+                _data, = gen1.next()
+                _d1_cost, _ = session.run([d1_cost, d1_train_op], feed_dict={real_data_int: _data, train_d2: 0 })
 
            # first phase, just train on batches of 128 real images
             else:
-                _data_adv, _labels_adv = gen_adv.next()
+                _data_adv, = gen_adv.next()
 
-                _data, _labels = gen2.next()
-                _labels = np.ones(_data.shape[0])
+                _data, = gen2.next()
 
                 # mix in the adversarial and real data
                 _data = np.concatenate((_data, _data_adv))
-                _labels = np.concatenate((_labels, _labels_adv))
-                _data, _labels = shuffle(_data, _labels)
-                _d1_cost, _d2_cost, _, _ = session.run([d1_cost, d2_cost, d1_train_op, d2_train_op], feed_dict={real_data_int: _data,
-                                                                                                                y : _labels,
-                                                                                                                train_d2: 1 })
+                _d1_cost, _d2_cost, _, _ = session.run([d1_cost, d2_cost, d1_train_op, d2_train_op], feed_dict={real_data_int: _data, train_d2: 1 })
 
             """
             _d2_cost, _ = session.run([d2_cost, d2_train_op], feed_dict={real_data_int: _data_adv,
@@ -436,10 +501,10 @@ with tf.Session(config=config) as session:
             dev_d2_costs = []
 
             if iteration < d2_start:
-                 for images, labels in dev_gen1():
+                 for images in dev_gen1():
+                    images = np.reshape(images, (BATCH_SIZE*2, 3, 128, 128))
                     _dev_d1_cost, summary = session.run([d1_cost, summary_op], feed_dict={real_data_int:images,
-                                                                     y: labels,
-                                                                     train_d2: 0 })
+                                                                                          train_d2: 0 })
                     dev_d1_costs.append(_dev_d1_cost)
                     lib.plot.plot('dev d1 cost', np.mean(dev_d1_costs))
                     """
@@ -454,15 +519,9 @@ with tf.Session(config=config) as session:
                         generate_random_image(iteration, _data, args.save_dir+'/random')
             else:
 
-                for images, labels in dev_gen2():
-                    for images_adv, labels_adv in dev_gen_adv():
-                        labels = np.ones(images.shape[0])
-                        images = np.concatenate((images, images_adv))
-                        labels = np.concatenate((labels, labels_adv))
-                        images, labels = shuffle(images, labels)
-                        _dev_d1_cost, _dev_d2_cost, summary = session.run([d1_cost, d2_cost, summary_op], feed_dict={real_data_int: images,
-                                                                                                                     y: labels,
-                                                                                                                     train_d2: 1 })
+                for images, in dev_gen2():
+                    for images_adv, in dev_gen_adv():
+                        _dev_d1_cost, _dev_d2_cost, summary = session.run([d1_cost, d2_cost, summary_op], feed_dict={real_data_int: images, train_d2: 1 })
                         dev_d1_costs.append(_dev_d1_cost)
                         dev_d2_costs.append(_dev_d2_cost)
                         break

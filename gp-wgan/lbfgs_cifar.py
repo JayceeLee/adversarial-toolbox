@@ -165,7 +165,84 @@ def D2(inputs):
     d2 = tf.reshape(d2, [-1])
     return d2
 
+def get_lbfgs(loss):
+  print_iterations = args.print_iterations if args.verbose else 0
+  if args.optimizer == 'lbfgs':
+    optimizer = tf.contrib.opt.ScipyOptimizerInterface(
+      loss, method='L-BFGS-B',
+      options={'maxiter': args.max_iterations,
+                  'disp': print_iterations})
+  return optimizer
+
+def minimize_lbfgs(sess, net, optimizer, init_img):
+  if args.verbose: print('\nMINIMIZING LOSS USING: L-BFGS OPTIMIZER')
+  init_op = tf.global_variables_initializer()
+  sess.run(init_op)
+  sess.run(net['input'].assign(init_img))
+  optimizer.minimize(sess)
 # calculate image gradient magnitudes and plot histogram
+
+# call with adversarials and with real image directories
+def get_images(image_dir)
+    imgs = []
+    images = glob(image_dir+"/*.png")
+    for im in images:
+	img = imread(im)
+	img = img.astype(np.float32)
+	img = preprocess(img)
+	imgs.append(img)
+    return imgs
+
+def stylize(content_img, label, init_img, frame=None):
+  with tf.device(args.device), tf.Session() as sess:
+
+    # setup network
+    net = detector(img)
+    base_net = classifier(img)
+    # get new label
+    new_label = 0
+    while new_label is not label:
+	new_label = np.random.randint(0, args.num_labels)
+
+    print "original prediction: {}".format(label)
+    print "Adversarial target:  {}".format(new_label)
+    # image loss
+    L_image = net(img)
+
+    # content loss
+    L_content = sum_content_losses(sess, net, content_img)
+
+    # denoising loss
+    L_tv = sum_total_variation_losses(sess, net, init_img)
+
+    # loss weights
+    alpha = args.content_weight
+    beta  = args.style_weight
+    theta = args.tv_weight
+
+    # total loss
+    L_total  = alpha * L_content
+    L_total += beta  * L_style
+    L_total += theta * L_tv
+
+    # video temporal loss
+    if args.video and frame > 1:
+      gamma      = args.temporal_weight
+      L_temporal = sum_shortterm_temporal_losses(sess, net, frame, init_img)
+      L_total   += gamma * L_temporal
+
+    # optimization algorithm
+    optimizer = get_optimizer(L_total)
+
+    if args.optimizer == 'adam':
+      minimize_with_adam(sess, net, optimizer, init_img, L_total)
+    elif args.optimizer == 'lbfgs':
+      minimize_with_lbfgs(sess, net, optimizer, init_img)
+
+    output_img = sess.run(net['input'])
+    output_img = convert_to_original_colors(np.copy(content_img), output_img)
+
+    write_image_output(output_img, content_img, style_imgs, init_img)
 
 """ Here we grab samples from G and push them through D1 and D2 """
 real_data_int = tf.placeholder(tf.int32, shape=[BATCH_SIZE*2, OUTPUT_DIM])

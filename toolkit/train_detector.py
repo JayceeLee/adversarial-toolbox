@@ -54,17 +54,17 @@ def pop_layer(model):
 def clf(outputs, model=False):
 
     if model == True:
-	top_model = Sequential()
-	top_model.add(Flatten(input_shape=(32, 32, 3)))
-	top_model.add(Dense(256, activation='relu'))
-	top_model.add(Dropout(0.5))
-	top_model.add(Dense(2, activation='softmax'))
+        top_model = Sequential()
+        top_model.add(Flatten(input_shape=(32, 32, 3)))
+        top_model.add(Dense(256, activation='relu'))
+        top_model.add(Dropout(0.5))
+        top_model.add(Dense(2, activation='softmax'))
     else:
-	top_model = [
-	        Flatten(),
-		Dense(256, activation='relu'),
-		Dropout(0.5),
-		Dense(1, activation='sigmoid'),
+        top_model = [
+                Flatten(),
+                Dense(256, activation='relu'),
+                Dropout(0.5),
+                Dense(1, activation='sigmoid'),
 	]
 
     return top_model
@@ -89,7 +89,7 @@ def load_new_data(args):
     # we want to partition dataset equally, according to the smaller set
     # ex. 5000 jsma images + 5000 cifar original images. Instead of 5k+50k
     max_size = min(x.shape[0], X_train.shape[0])
-    size_train = int(max_size*0.8)
+    size_train = int(max_size*0.8)+1
     size_val = int(max_size*0.2)
 
     # shuffle everything. This is ok because labels are binary
@@ -142,6 +142,15 @@ def ft():
 
     X_train, Y_train, X_test, Y_test = load_new_data(args)
 
+    print Y_train
+    """ TO DEBUG LABELS
+    from scipy.misc import imshow
+    for i, im in enumerate(X_train):
+        print Y_train[i]
+        plt.imshow(im)
+        plt.show()
+    """
+    print Y_test
     if not hasattr(backend, "tf"):
         raise RuntimeError("This tutorial requires keras to be configured"
                            " to use the TensorFlow backend.")
@@ -154,9 +163,6 @@ def ft():
     # Create TF session and set as Keras backend session
 
     print "==> Beginning Session"
-    label_smooth = .1
-    Y_train = Y_train.clip(label_smooth / 2., 1. - label_smooth)
-
     # Load model
     print "==> loading vgg model"
 
@@ -181,9 +187,16 @@ def ft():
 
     model.fit(X_train, Y_train,
 	      epochs=args.epochs,
-	      batch_size=128,
+	      batch_size=32,
               shuffle=True,
 	      validation_data=(X_test, Y_test))
+
+    for i, im in enumerate(X_test):
+        res = model.predict(im.reshape((1, 32, 32, 3)))
+        if res is not Y_test[i]:
+            print res
+            plt.imshow(im)
+            plt.show()
 
     result_dir = os.getcwd()+'/ckpts/detectors/sigmoid_'+args.attack+'/'
     if not os.path.exists(result_dir):
