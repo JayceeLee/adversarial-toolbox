@@ -95,7 +95,6 @@ ENV/
 *.h5
 
 OSDN/
-deepfool/
 images/
 cifar-10-batches-py/
 npy/
@@ -116,3 +115,7 @@ samples/
 *.index
 *.data-00000-of-00001
 *checkpoint
+images/
+*.t7
+*.JPEG
+board/
