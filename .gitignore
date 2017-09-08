@@ -116,7 +116,7 @@ samples/
 *.data-00000-of-00001
 *checkpoint
 images/
+weights/
 *.t7
 *.JPEG
 board/
-cycleGAN/
