@@ -1,0 +1,1060 @@
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+generated 99 images with L-BFGS
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [ 100.    0.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [ 100.    0.]]% accuracy
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [   0.  100.]
+ [ 100.    0.]
+ ..., 
+ [ 100.    0.]
+ [ 100.    0.]
+ [   0.  100.]]% accuracy
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [   0.  100.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [ 100.    0.]]% accuracy
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [ 100.    0.]
+ [ 100.    0.]
+ ..., 
+ [ 100.    0.]
+ [ 100.    0.]
+ [   0.  100.]]% accuracy
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [ 100.    0.]
+ [   0.  100.]
+ ..., 
+ [   0.  100.]
+ [   0.  100.]
+ [   0.  100.]]% accuracy
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [ 100.    0.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [ 100.    0.]
+ [ 100.    0.]]% accuracy
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [   0.  100.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [ 100.    0.]]% accuracy
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [ 100.    0.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 0
+Iteration 0
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [ 100.    0.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [ 100.    0.]]% accuracy
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [ 100.    0.]
+ [ 100.    0.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [ 100.    0.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [ 100.    0.]
+ [ 100.    0.]]% accuracy
+Iteration 0
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [   0.  100.]
+ [ 100.    0.]
+ ..., 
+ [ 100.    0.]
+ [ 100.    0.]
+ [   0.  100.]]% accuracy
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [ 100.    0.]
+ [ 100.    0.]
+ ..., 
+ [ 100.    0.]
+ [ 100.    0.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 1
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [   0.  100.]
+ [ 100.    0.]
+ ..., 
+ [   0.  100.]
+ [ 100.    0.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 1
+generated 80 images with L-BFGS
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]
+ ..., 
+ [   0.  100.]
+ [   0.  100.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]
+ ..., 
+ [   0.  100.]
+ [ 100.    0.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 1
+Iteration 1
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [ 100.    0.]
+ [   0.  100.]
+ ..., 
+ [   0.  100.]
+ [   0.  100.]
+ [ 100.    0.]]% accuracy
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 1
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [ 100.    0.]
+ [   0.  100.]
+ ..., 
+ [   0.  100.]
+ [   0.  100.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 1
+Iteration 0
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [   0.  100.]
+ [   0.  100.]
+ ..., 
+ [   0.  100.]
+ [ 100.    0.]
+ [ 100.    0.]]% accuracy
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]
+ ..., 
+ [   0.  100.]
+ [ 100.    0.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 0
+fine tuned CNN to [[   0.  100.]
+ [   0.  100.]
+ [   0.  100.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]]% accuracy
+Iteration 1
+Iteration 1
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+generated 0 images with L-BFGS
+Iteration 0
+generated 0 images with L-BFGS
+Iteration 0
+generated 0 images with L-BFGS
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+generated 20 images with L-BFGS
+Iteration 0
+generated 1990 images with L-BFGS
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+fine tuned CNN to [[ 100.    0.]
+ [   0.  100.]
+ [ 100.    0.]
+ ..., 
+ [ 100.    0.]
+ [   0.  100.]
+ [   0.  100.]]% accuracy
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0
+Iteration 0

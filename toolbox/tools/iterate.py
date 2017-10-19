@@ -3,7 +3,8 @@ import sys
 sys.path.append('../')
 import numpy as np
 import train_detector as td
-import gradient_svm as gs
+import gcnn
+import gsvm as gs
 from attacks import lbfgs
 from scipy.misc import imsave, imread
 from glob import glob
@@ -13,16 +14,15 @@ from sklearn.externals import joblib
 import cifar_base
 
 home = '/home/neale/repos/adversarial-toolbox'
-save_dir_base = home+'/images/adversarials/lbfgs/cifar/test1/vggbn_test'
-images_dir = home+'/images/cifar/train/'
-wpath_base = home+'/toolbox/models/weights/detectors/iter/lbfgs_cifar_'
-wpath_init = 'lbfgs_cifar'
-start_iter = 3
+save_dir_base = home+'/images/adversarials/lbfgs/imagenet/test1/resnet_test'
+images_dir = home+'/images/imagenet12/train/'
+wpath_base = home+'/toolbox/models/weights/detectors/lbfgs/imagenet/iter_'
+wpath_init = 'iter_0'
+start_iter = 0
 min_nonzero = 1000
-log_file = './svm_scores.txt'
+log_file = './cnn_scores.txt'
 LOG = True
 n_images = 10000
-impath = '/home/neale/repos/adversarial-toolbox/images/cifar/train/maltese_dog_s_000912.png'
 
 def logger(data):
 
@@ -34,13 +34,16 @@ def generate_adv(wpath, it):
 
     num_gen, start = 0, 2000
     if it == 0:
-        targets = 10
+        targets = 1000
         top = 'vanilla'
     else:
         targets = 2
         top = 'detector'
-    (x, _), (x_val, _) = load_data.load_real()
-    score = np.inf
+    (x, _), (x_val, _) = load_data.load_real(targets,
+                                             images_dir,
+                                             'JPEG',
+                                             (224, 224, 3)
+    #score = np.inf
     #while score > 10000:
     model = lbfgs.load_model(wpath, top)
         #print "scoring"
@@ -51,9 +54,6 @@ def generate_adv(wpath, it):
 
     for i, img in enumerate(x[start:n_images]):
         # lbfgs.display_im(img)
-        img = imread(impath, mode='RGB')
-
-
         adv_obj = lbfgs.generate(model, img, targets=targets)
         if adv_obj is None:
             print "Failed to apply attack"

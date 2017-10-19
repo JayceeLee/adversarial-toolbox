@@ -32,10 +32,10 @@ def deconstruct_grid(args):
     images  = []
     x = imread(f)
     print x.shape
-    for row in range(x.shape[0]/32):
-        for col in range(x.shape[1]/32):
-            im = x[32*row:32*(row+1),(col*32):32*(col+1),:]
-            imsave('./rand_grid_images/im_{}.png'.format(i), im)
+    for row in range(x.shape[0]/28):
+        for col in range(x.shape[1]/28):
+            im = x[28*row:28*(row+1),(col*28):28*(col+1)]
+            imsave('./grid_images/im_{}.png'.format(i), im)
             images.append(im)
             i += 1
 
