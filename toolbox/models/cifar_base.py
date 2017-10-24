@@ -1,18 +1,8 @@
-'''Train a simple deep CNN on the CIFAR10 small images dataset.
-
-GPU run command with Theano backend (with TensorFlow, the GPU is automatically used):
-    THEANO_FLAGS=mode=FAST_RUN,device=gpu,floatx=float32 python cifar10_cnn.py
-
-It gets down to 0.65 test logloss in 25 epochs, and down to 0.55 after 50 epochs.
-(it's still underfitting at that point, though).
-'''
-
 from __future__ import print_function
 import keras
 from keras.datasets import cifar10
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
-from keras.layers.normalization import BatchNormalization
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 
@@ -22,65 +12,72 @@ import numpy as np
 
 batch_size = 32
 num_classes = 10
-epochs = 150
+epochs = 50
 data_augmentation = True
 num_predictions = 20
 save_dir = os.path.join(os.getcwd(), 'saved_models')
 model_name = 'keras_cifar10_trained_model.h5'
 
-def get_model(top='vanilla', in_s=(32,32,3)):
 
+def get_model(top='vanilla', shape=(32, 32, 3)):
     model = Sequential()
     model.add(Conv2D(32, (3, 3), padding='same',
-                     input_shape=in_s))
+                     input_shape=shape))
     model.add(Activation('relu'))
-    model.add(BatchNormalization())
     model.add(Conv2D(32, (3, 3)))
     model.add(Activation('relu'))
-    model.add(BatchNormalization())
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(0.25))
 
     model.add(Conv2D(64, (3, 3), padding='same'))
     model.add(Activation('relu'))
-    model.add(BatchNormalization())
     model.add(Conv2D(64, (3, 3)))
     model.add(Activation('relu'))
-    model.add(BatchNormalization())
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(0.25))
 
+    model.add(Flatten())
+
     if top == 'vanilla':
-        model.add(Flatten())
+
         model.add(Dense(512))
         model.add(Activation('relu'))
-        model.add(BatchNormalization())
         model.add(Dropout(0.5))
         model.add(Dense(num_classes))
-
         model.add(Activation('softmax'))
 
     elif top == 'detector':
 
-        model.add(Flatten())
-        model.add(Dense(512, activation='relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(.5))
-        model.add(Dense(1, activation='sigmoid'))
+        model.add(Dense(512))
+        model.add(Activation('relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(2))
+        model.add(Activation('softmax'))
 
-    elif top == False:
+    elif top == 'gan':
+
+        model.add(Dense(512))
+        model.add(Activation('relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(1))
+        model.add(Activation('sigmoid'))
+
+    elif top is False:
         pass
 
     return model
 
-def vggbn(top, path=None):
+
+def cifar_model(top, path=None):
     model = get_model(top)
     if path is None:
-        path = '../models/lbfgs_cifar.h5'
+        return model
+    print("loading weights from {}".format(path))
     model.load_weights(path, by_name=True)
     return model
 
-def app():
+
+def train():
 
     # The data, shuffled and split between train and test sets:
     (x_train, y_train), (x_test, y_test) = cifar10.load_data()
@@ -88,18 +85,14 @@ def app():
     print(x_train.shape[0], 'train samples')
     print(x_test.shape[0], 'test samples')
 
-    import sys
-    print (x_train.shape[1:])
-    sys.exit(0)
     # Convert class vectors to binary class matrices.
     y_train = keras.utils.to_categorical(y_train, num_classes)
     y_test = keras.utils.to_categorical(y_test, num_classes)
 
-
-    model = get_model()
     # initiate RMSprop optimizer
     opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
 
+    model = get_model(top='vanilla')
     # Let's train the model using RMSprop
     model.compile(loss='categorical_crossentropy',
                   optimizer=opt,
@@ -143,16 +136,8 @@ def app():
                             epochs=epochs,
                             validation_data=(x_test, y_test))
 
-    # Save model and weights
-    if not os.path.isdir(save_dir):
-        os.makedirs(save_dir)
-    model_path = os.path.join(save_dir, model_name)
-    model.save(model_path)
-    print('Saved trained model at %s ' % model_path)
-
     # Load label names to use in prediction results
     label_list_path = 'datasets/cifar-10-batches-py/batches.meta'
-
 
     keras_dir = os.path.expanduser(os.path.join('~', '.keras'))
     datadir_base = os.path.expanduser(keras_dir)
@@ -181,6 +166,4 @@ def app():
                                                               predicted_label))
         if predict_index == num_predictions:
             break
-
-if __name__ == '__main__':
-    app()
+    return model

@@ -1,6 +1,5 @@
 import os
 import sys
-import keras
 sys.path.append('../')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,6 +24,9 @@ home = '/home/neale/repos/adversarial-toolbox'
 save_dir_base = home+'/images/adversarials/lbfgs/imagenet/test1/resnet_test'
 images_dir = home+'/images/imagenet12/train/'
 wpath_base = home+'/toolbox/models/weights/detectors/lbfgs/imagenet/iter_'
+val_ilsvrc_dir = home+'/images/imagenet12/val/'
+val_ilsvrc_y = home+'/images/val_num.txt'
+
 wpath_init = 'iter0'
 start_iter = 0
 min_nonzero = 1000
@@ -67,7 +69,7 @@ def generate_adv(wpath, it):
     val_model = ResNet50(weights='imagenet')
 
     for i, img in enumerate(train[start:n_images]):
-        #lbfgs.display_im(img)
+        # lbfgs.display_im(img)
         x = img+0.
         init_pred = validate_label(val_model, x)
         print init_pred
@@ -101,7 +103,7 @@ def generate_adv(wpath, it):
         preds = val_model.predict(y)
         kpred = np.argmax(preds)
         print "keras pred: ", kpred
-	imsave(save_str, x)
+        imsave(save_str, x)
         print "SUCCESS, images saved {}".format(num_gen)
         print "Images attempted for this run: {}".format(i+1)
         print "------------------------"
@@ -148,7 +150,7 @@ def train_base():
 
     model = cifar_base.train()
     model = ResNet50(weights='imagenet', include_top=True)
-    #model, hist = gcnn.train_gcnn(train, test, model)
+    # model, hist = gcnn.train_gcnn(train, test, model)
     model.save_weights(wpath_base+wpath_init)
 
 
@@ -185,8 +187,8 @@ def cascade_classifier(train, test):
         x_ts = np.zeros((n_examples, 64*6))
         x_vs = np.zeros((x_v.shape[0], 64*6))
         layer = Model(inputs=model.input, outputs=model.get_layer(name).output)
-        print "Loading ", len(x_t), " statistics for training set: layer ", name
-        #for idx, im in enumerate(x_t):  # get new features and cat old ones
+        print "Loading ", len(x_t), " statistics for train set: layer ", name
+        # for idx, im in enumerate(x_t):  # get new features and cat old ones
         x_ts = gcnn.extract_features(x_t, x_ts, layer)
         print "layer output: feature maps of dim: {}".format(x_ts.shape[-1]/6.)
 
@@ -203,7 +205,8 @@ def cascade_classifier(train, test):
 
         print "cascading:\ntrainx: {}, valx: {}".format(x_ts.shape, x_vs.shape)
         print "trainy: {}, valy: {}".format(y_t.shape, y_v.shape)
-        (p_real, p_adv), (n_real, n_adv) = gsvm.cascade_svm((x_ts, y_t), (x_vs, y_v))
+        (p_real, p_adv), (n_real, n_adv) = gsvm.cascade_svm((x_ts, y_t),
+                                                            (x_vs, y_v))
 
         old_accuracy = accuracy
         accuracy = float(len(p_real)+len(p_adv))/len(x_v)
@@ -218,12 +221,16 @@ def cascade_classifier(train, test):
         new_valx_adv = np.take(x_v, n_adv, axis=0)
         new_valx_adv2 = np.take(x_v, p_adv, axis=0)
         new_valx_reals = np.take(x_v, n_real, axis=0)
-        x_v = np.concatenate((new_valx_reals, new_valx_adv, new_valx_adv2), axis=0)
+        x_v = np.concatenate((new_valx_reals,
+                              new_valx_adv,
+                              new_valx_adv2), axis=0)
 
         new_valy_adv = np.take(y_v, n_adv, axis=0)
         new_valy_adv2 = np.take(y_v, p_adv, axis=0)
         new_valy_reals = np.take(y_v, n_real, axis=0)
-        y_v = np.concatenate((new_valy_reals, new_valy_adv, new_valy_adv2), axis=0)
+        y_v = np.concatenate((new_valy_reals,
+                              new_valy_adv,
+                              new_valy_adv2), axis=0)
 
         x_v, y_v = shuffle(x_v, y_v)
         detected = (total_adv - len(n_adv)) / total_adv
@@ -239,15 +246,49 @@ def cascade_classifier(train, test):
         print "Handing to new SVM round\n"
 
 
-def self_aware_model(train, test, wpath):
+def test_val(images, labels):
+    model = ResNet50(weights='imagenet', include_top=True)
+    correct = 0
+    assert len(images) == len(labels), ("Number of samples must equal"
+                                        "the number of labels")
 
-    gcnn.train_self_aware_model(train, test, wpath)
+    print "Testing labeled val set: {}".format(images.shape)
+    preds = model.predict(images, batch_size=32, verbose=1)
+    print "Sorting and gather prediction stats"
+    for i, (p, y) in enumerate(zip(preds, labels)):
+        pred5 = np.argsort(p)[-5:][::-1]
+        # print "{}: {}".format(i, preds)
+        # print('Predicted:', decode_predictions(pred, top=5)[0])
+        if y == pred5[0]:
+            correct += 1.
+    print "{}/{} correct top5".format(correct, len(labels))  # baseline acc
+
+
+def get_labeled_adv(x, y, xl, yl):
+
+    y_labels = np.argmax(y, axis=-1)
+
+    adv_idx = np.where(y_labels == 0)[0]
+    real_idx = np.where(y_labels == 1)[0]
+    x_adv = np.take(x, adv_idx, axis=0)
+    y_adv = np.take(y, adv_idx, axis=0)
+    y_real = np.take(y, real_idx, axis=0)
+    n_adv = len(adv_idx)
+    x_full = np.concatenate((xl[:len(x)-n_adv], x_adv))
+    y_full = np.concatenate((y_real, y_adv))
+    # create y which encodes 0-999 for the ground truth, -1 for adversarisl
+    y_gt = np.zeros(len(x_full))
+    y_gt[:n_adv] = yl[:n_adv]
+    y_gt[n_adv:] = -1
+    x, y, y_gt = shuffle(x_full, y_full, y_gt)
+    return (x, y), y_gt
+
 
 def main():
 
     converged = 0
     it = start_iter
-    lbfgs.config_tf()
+    # lbfgs.config_tf()
 
     # train_base()
     wpath = wpath_base+str(it)+'.h5'
@@ -261,15 +302,18 @@ def main():
         wpath = old_wpath[:-5]+str(it+1)+'.h5'
         adv_dir = save_dir_base+str(it)+'/'
 
-        train, test = load_data.load_all_resnet(adv_dir, images_dir)
-
         # acc, _ = ft_detector(it, train, test, wpath[:-3], old_wpath)
-        self_aware_model(train, test, wpath)
-        cascade_classifier(train, test)
+        # train, test = load_data.load_all_resnet(adv_dir, images_dir)
+        _, test = load_data.load_all_resnet(adv_dir, images_dir)
 
+        images, labels = load_data.load_ilsvrc_labeled(2000, val_ilsvrc_dir,
+                                                       val_ilsvrc_y)
+        test_val(images, labels)
+        (x, y), y_gt = get_labeled_adv(test[0], test[1], images, labels)
 
-        if acc < .1:
-            converged = 1
+        gcnn.train_self_aware_model(x, y, wpath, gt=y_gt)
+        # cascade_classifier(train, test)
+
         it += 1
 
     if LOG:

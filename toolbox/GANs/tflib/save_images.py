@@ -1,11 +1,7 @@
-"""
-Image grid saver, based on color_grid_vis from github.com/Newmu
-"""
 import os
 import numpy as np
-import scipy.misc
 from scipy.misc import imsave
-import matplotlib.pyplot as plt
+
 
 def save_images(X, save_path, save_dir):
     # [0, 1] -> [0,255]
@@ -15,8 +11,7 @@ def save_images(X, save_path, save_dir):
     n_samples = X.shape[0]
     rows = int(np.sqrt(n_samples))
 
-    result_dir = '../samples/cifar10/'+save_dir+'/'
-    #print "saving to ", result_dir
+    result_dir = save_dir+'/'
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
 

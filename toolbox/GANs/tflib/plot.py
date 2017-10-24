@@ -8,6 +8,7 @@ import collections
 import time
 import cPickle as pickle
 
+save_dir = './images/log/'
 _since_beginning = collections.defaultdict(lambda: {})
 _since_last_flush = collections.defaultdict(lambda: {})
 
@@ -32,7 +33,7 @@ def flush():
 		plt.plot(x_vals, y_vals)
 		plt.xlabel('iteration')
 		plt.ylabel(name)
-		plt.savefig(name.replace(' ', '_')+'.jpg')
+		plt.savefig(save_dir+name.replace(' ', '_')+'.jpg')
 
 	print "iter {}\t{}".format(_iter[0], "\t".join(prints))
 	_since_last_flush.clear()

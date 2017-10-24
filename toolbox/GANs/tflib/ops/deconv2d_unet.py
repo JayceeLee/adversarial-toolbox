@@ -17,7 +17,7 @@ def unset_weights_stdev():
     global _weights_stdev
     _weights_stdev = None
 
-def Deconv2D(
+def Deconv2D_Unet(
     name,
     input_dim,
     output_dim,
@@ -72,7 +72,6 @@ def Deconv2D(
             name+'.Filters',
             filter_values
         )
-
         if weightnorm==None:
             weightnorm = _default_weightnorm
         if weightnorm:
@@ -85,10 +84,15 @@ def Deconv2D(
                 norms = tf.sqrt(tf.reduce_sum(tf.square(filters), reduction_indices=[0,1,3]))
                 filters = filters * tf.expand_dims(target_norms / norms, 1)
 
-
         inputs = tf.transpose(inputs, [0,2,3,1], name='NCHW_to_NHWC')
-
         input_shape = tf.shape(inputs)
+
+	batch, in_height, in_width, in_channels = [int(d) for d in inputs.get_shape()]
+        filters = tf.get_variable(name+".filter",
+				  [4, 4, output_dim, in_channels],
+				  dtype=tf.float32,
+				  initializer=tf.random_normal_initializer(0, 0.02))
+
         try: # tf pre-1.0 (top) vs 1.0 (bottom)
             output_shape = tf.pack([input_shape[0], 2*input_shape[1], 2*input_shape[2], output_dim])
         except Exception as e:

@@ -20,6 +20,7 @@ from keras.layers import Input
 from sklearn.decomposition import PCA
 
 from sklearn.utils import shuffle
+from sklearn import metrics
 from scipy.signal import convolve2d
 from scipy import ndimage
 from skimage import color
@@ -191,33 +192,66 @@ def Grad2D_output_shape(input_shape):
 
 def self_aware_loss(y_true, y_pred):
 
-    abstain_penalty = 0.3  # ea
-    adversarial_penalty = 0.7  # eq
+    abstain_penalty = 2.  # ea
+    adversarial_penalty = 10.  # eq
 
-    # apply first two masks
-    # assert True is False, K.shape(y_true)
     ea = tf.constant(abstain_penalty, shape=(1,))
     eq = tf.constant(adversarial_penalty, shape=(1,))
 
     label_true = tf.argmax(y_true)
     label_pred = tf.argmax(y_pred)
 
-    xe = tf.nn.softmax_cross_entropy_with_logits(labels=y_true, logits=y_pred)
-    Lsa = xe
+    xe = tf.nn.softmax(logits=y_pred)
 
-    def f1(): return [eq]
-    def f2(): return xe
-    L1 = tf.cond(tf.equal(label_true[0], 0), f1, f2)
+    # we want to compute a whole lottsa shit
+    p1 = y_pred[1]
+    p11 = K.constant(1) - K.gather(y_pred, label_true[0])
+    p12 = tf.multiply(p1, p11)
+    p2 = tf.multiply(y_pred[0], eq)
+    ai = p12 + p2
+    predict_options = K.concatenate([eq, p11])
 
-    def f3(): return L1
-    def f4(): return xe
-    Ladv = tf.cond(tf.not_equal(label_true[0], label_pred[0]), f3, f4)
+    def f1(): return K.gather(predict_options, label_pred)
+    def f2(): return ea
+    L = tf.cond(tf.less(ai[0], ea[0]), f1, f2)
+    K.print_tensor(ai)
+    K.print_tensor(ea)
+    return p12
 
-    def f5(): return [ea]
-    def f6(): return Ladv
-    Lsa = tf.cond(tf.reduce_max(y_pred) < 0.5, f5, f6)
+    return L
 
-    return Lsa
+def self_aware_decision(y_true, y_true_d, y_pred_d):
+
+    abstain_penalty = 4.  # ea
+    adversarial_penalty = 10.  # eq
+
+    ea = abstain_penalty
+    eq = adversarial_penalty
+
+    label_true = np.argmax(y_true_d)
+    label_resnet = np.argmax(y_true)
+
+    def softmax(x):  # stable
+        e_x = np.exp(x - np.max(x))
+        return e_x / e_x.sum(axis=0)
+
+    sm = softmax(y_pred_d[0])
+
+    p1 = sm[1] * (1 - sm[label_true])
+    p2 = sm[0] * eq
+    ai = p1 + p2
+
+    # print p1, p2, ai
+
+    if ai < ea: # we should predict
+        if label_true == 1:
+            res = label_resnet
+        else:
+            res = .7
+    else:
+        res = ea
+
+    return res, ai
 
 
 def collect_gradients(data, arr):
@@ -488,55 +522,99 @@ def train_gcnn(train, test, model):
     return model, (x_v, y_v)
 
 
-def train_self_aware_model(train, test, wpath):
+def plot_roc(y_test, y_score, t):
+
+    for q in [0, 1]:
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+        fpr, tpr, _ = metrics.roc_curve(y_test, y_score, pos_label=q)
+        roc_auc = metrics.auc(fpr, tpr)
+        plt.figure()
+        lw = 2
+        plt.plot(fpr, tpr, color='magenta',
+                lw=lw, label='ROC curve (area = {0:.2f}), t = {1}'.format(roc_auc, t))
+        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating characteristic')
+        plt.legend(loc="lower right")
+        plt.show()
+
+
+def train_self_aware_model(x, y, wpath, gt=None):
 
     # detector should make binary classifications
-    x_t, y_t = train
-    x_v, y_v = test
     detector = load_resnet(top='detector', weight_path=wpath, gcnn=True)
-    model = ResNet50(weights='imagenet', include_top=False)
+    model = ResNet50(weights='imagenet', include_top=True)
     out_shape = model.layers[-1].output_shape
     print out_shape
-    input_tensor = Input(shape=(1, 1, 2049))
-    clf_model = Model(inputs=input_tensor, outputs=input_tensor)
-    clf = load_clf(clf_model)
-    clf.compile(optimizer='adam',
-                loss=self_aware_loss)
 
-    clf_error = 0
-    adv_error = 0
-    batch_x = np.zeros((16, 1, 1, 2048+1))
-    batch_y = np.zeros((16, 2))
+    assert len(x) == len(y) == len(gt)
+    print "generating predictions through self aware model"
+    predicted = 0
+    abstained = 0
+    statistics = []
+    resnet_top5 = []
+    for idx, (img, label) in enumerate(zip(x, y)):
+        batch_img = np.expand_dims(img, 0)
+        detector_proba = detector.predict(batch_img)
+        resnet_proba = model.predict(batch_img)  # get adv prediction
+        resnet_top = np.argsort(resnet_proba)[0][-5:][::-1]
+        pred, prob = self_aware_decision(resnet_proba, label, detector_proba)
+        statistics.append([prob, label, gt[idx]])
+        resnet_top5.append(resnet_top)
 
-    for _ in range(10):
-        for idx, (img, label) in enumerate(zip(x_t, y_t)):
-            batch_img = np.expand_dims(img, 0)
-            detector_proba = detector.predict(batch_img)
-            detector_label = np.argmax(detector_proba)
-            resnet_proba = model.predict(batch_img) # get adv prediction
-            # concat a map of ones or zeros depending on detector output
-            H = resnet_proba.shape[-3]
-            W = resnet_proba.shape[-2]
-            if np.argmax(label) == 0:
-                adv_map = np.zeros((H, W))
-            else:
-                adv_map = np.ones((H, W))
-            adv_map = np.expand_dims(adv_map, 0)
-            clf_input = np.concatenate((resnet_proba[0], adv_map), axis=-1)
-            batch_x[idx%16] = clf_input
-            batch_y[idx%16] = label
+    print "total reals: {}".format(len(np.where(np.argmax(y, axis=-1) == 1)[0]))
+    print "total adversarials: {}".format(len(np.where(np.argmax(y, axis=-1) == 0)[0]))
+    for t in range(3, 10):
+        adv_abstained = 0
+        real_abstained = 0
+        adv_predicted = 0
+        real_predicted = 0
+        abstained = 0
+        predicted = 0
+        penalty = 0
+        resnet_accuracy = 0
+        roc_preds = np.zeros(len(x))
+        roc_labels = np.zeros(len(x))
+        print "simulating t = {}...".format(t)
+        for idx, (prob, label, truth) in enumerate(statistics):
+            label = np.argmax(label)
+            roc_labels[idx] = label
+            if prob < t:  # we predict
+                predicted += 1
+                roc_preds[idx] = 1
+                if label == 0:
+                    adv_predicted += 1
+                else:
+                    if truth == resnet_top5[idx][0]:  # if gt in top5
+                        resnet_accuracy += 1.
+                    real_predicted += 1
 
-            if (idx % 16) == 0:
-                print "train loss: ", clf.train_on_batch(batch_x, batch_y)
+            elif prob >= 10:  # not good
+                penalty += 1
 
-                print "test loss: ", clf.test_on_batch(batch_x, batch_y)
-            """
-            pred = np.argmax(clf_proba)
-            if pred != np.argmax(label):
-                clf_error += 1.
-            if detector_label != np.argmax(label):
-                adv_error += 1.
-            """
-    print "clf acc: ", 1-(clf_error/len(x_t))
-    print "adv acc: ", 1-(adv_error/len(x_t))
+            else:  # we abstained
+                roc_preds[idx] = 0
+                abstained += 1
+                if label == 0:
+                    adv_abstained += 1
+                else:
+                    real_abstained += 1
+
+        assert predicted + abstained + penalty == len(x)
+        print "top5 accuracy: {}".format(resnet_accuracy / real_predicted)
+        # plot_roc(roc_labels, roc_preds, t)
+        print "total abstain: {}".format(abstained)
+        print "total predicted: {}".format(predicted)
+        print "total errors: {}".format(penalty)
+        print "misabstained reals (fn): {}".format(real_abstained)
+        print "mispredicted adv (fp): {}".format(adv_predicted)
+        print "well classified reals (tp): {}".format(real_predicted)
+        print "well abstained adversarials: (tn): {}".format(adv_abstained)
+        print "********************************************************"
+
 

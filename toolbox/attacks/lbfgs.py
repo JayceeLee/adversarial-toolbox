@@ -7,8 +7,8 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import sys
 sys.path.append('../')
-from tools.cifar_base import cifar_model
-from foolbox.criteria import TargetClass
+# from tools.cifar_base import cifar_model
+from foolbox.criteria import TargetClass, Misclassification
 from keras.backend.tensorflow_backend import set_session
 
 
@@ -28,14 +28,22 @@ def display_im(img, title=None):
     plt.show()
 
 
-def load_model(weights=None, top=None):
-    kmodel = cifar_model(top=top, path=weights)
+def load_model(weights=None, top=None, model=None):
+    if model is not None:  # resnet
+        preprocessing = (np.array([103.939, 116.779, 123.68]), 1)
+        fmodel = foolbox.models.KerasModel(model, bounds=(0, 255), preprocessing=preprocessing)
+        return fmodel
+    # kmodel = cifar_model(top=top, path=weights)
     # kmodel.summary()
-    fmodel = foolbox.models.KerasModel(kmodel, bounds=(0, 255))
-    return fmodel
+    # fmodel = foolbox.models.KerasModel(kmodel, bounds=(0, 255))
+    # return fmodel
 
 
 def get_target(label, r):
+
+    if r == 2:
+        target = 0
+        return target
 
     target = label
     while target == label:
@@ -43,11 +51,11 @@ def get_target(label, r):
     return target
 
 
-def print_stats(adversarial, model):
+def print_stats(image, original, model):
 
     failed = 0
-    l1 = np.argmax(model.predictions(adversarial.image))
-    l2 = np.argmax(model.predictions(adversarial.original_image))
+    l1 = np.argmax(model.predictions(image))
+    l2 = np.argmax(model.predictions(original))
     print "Adversarial Predicted: ", l1
     print "Original Predicted: ", l2
     if l1 == l2:
@@ -66,6 +74,15 @@ def score_dataset(model, x, label):
     return misses
 
 
+def build_attack(attack_str, model, criterion):
+    if attack_str == 'deepfool':
+        return foolbox.attacks.DeepFoolAttack(model, criterion)
+    if attack_str == 'lbfgs':
+        return foolbox.attacks.LBFGSAttack(model, criterion)
+    else:
+        print "model not supported"
+        sys.exit(0)
+
 def generate(model, image, targets):
 
     label = np.argmax(model.predictions(image))
@@ -75,11 +92,17 @@ def generate(model, image, targets):
         return None
     target_class = get_target(label, targets)
     print "Target Class: {}".format(target_class)
-    # criterion = TargetClass(target_class)
+    #criterion = TargetClass(target_class)
+    criterion = Misclassification()
     try:
-        attack = foolbox.attacks.LBFGSAttack(model)  # , criterion)
-        adversarial = attack(image, label, unpack=False)
-        return adversarial
+        #attack = foolbox.attacks.LBFGSAttack(model, criterion)
+        attack = build_attack('deepfool', model, criterion)
+        # attack = foolbox.attacks.GradientAttack(model, criterion)
     except:
-        print "FAILED"
         return None
+    adversarial = attack(image, label, unpack=False)
+    return adversarial
+    # return adversarial
+    # except:
+    #     print "FAILED"
+    #     return None

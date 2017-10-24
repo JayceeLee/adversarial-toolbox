@@ -17,7 +17,11 @@ import tflib.ops.batchnorm
 import tflib.ops.deconv2d
 import tflib.save_images
 import tflib.mnist
+import tflib.mnist_custom
 import tflib.plot
+
+import generators
+import discriminators
 
 MODE = 'wgan-gp' # dcgan, wgan, or wgan-gp
 DIM = 64 # Model dimensionality
@@ -26,112 +30,30 @@ CRITIC_ITERS = 5 # For WGAN and WGAN-GP, number of critic iters per gen iter
 LAMBDA = 10 # Gradient penalty lambda hyperparameter
 ITERS = 200000 # How many generator iterations to train for
 OUTPUT_DIM = 784 # Number of pixels in MNIST (28*28)
+SAVE_DIR = '../../images/wgan_samples/MNIST_ADV'
+SAVE_ITERS = [1000, 5000, 10000]
+TF_TRIAL = 0
+START = 10000
+SAVE_NAME = 'MNIST_ADV'
+MODEL_DIR = '../models/weights/gp_wgan/MNIST_ADV/'
+MODEL_NAME = 'MNIST_ADV_10000_steps'
+
+Generator = generators.GMnist
+Discriminator = discriminators.DMnist
 
 lib.print_model_settings(locals().copy())
 
-def LeakyReLU(x, alpha=0.2):
-    return tf.maximum(alpha*x, x)
-
-def ReLULayer(name, n_in, n_out, inputs):
-    output = lib.ops.linear.Linear(
-        name+'.Linear',
-        n_in,
-        n_out,
-        inputs,
-        initialization='he'
-    )
-    return tf.nn.relu(output)
-
-def LeakyReLULayer(name, n_in, n_out, inputs):
-    output = lib.ops.linear.Linear(
-        name+'.Linear',
-        n_in,
-        n_out,
-        inputs,
-        initialization='he'
-    )
-    return LeakyReLU(output)
-
-def Generator(n_samples, noise=None):
-    if noise is None:
-        noise = tf.random_normal([n_samples, 128])
-
-    output = lib.ops.linear.Linear('Generator.Input', 128, 4*4*4*DIM, noise)
-    if MODE == 'wgan':
-        output = lib.ops.batchnorm.Batchnorm('Generator.BN1', [0], output)
-    output = tf.nn.relu(output)
-    output = tf.reshape(output, [-1, 4*DIM, 4, 4])
-
-    output = lib.ops.deconv2d.Deconv2D('Generator.2', 4*DIM, 2*DIM, 5, output)
-    if MODE == 'wgan':
-        output = lib.ops.batchnorm.Batchnorm('Generator.BN2', [0,2,3], output)
-    output = tf.nn.relu(output)
-
-    output = output[:,:,:7,:7]
-
-    output = lib.ops.deconv2d.Deconv2D('Generator.3', 2*DIM, DIM, 5, output)
-    if MODE == 'wgan':
-        output = lib.ops.batchnorm.Batchnorm('Generator.BN3', [0,2,3], output)
-    output = tf.nn.relu(output)
-
-    output = lib.ops.deconv2d.Deconv2D('Generator.5', DIM, 1, 5, output)
-    output = tf.nn.sigmoid(output)
-
-    return tf.reshape(output, [-1, OUTPUT_DIM])
-
-def Discriminator(inputs):
-    output = tf.reshape(inputs, [-1, 1, 28, 28])
-
-    output = lib.ops.conv2d.Conv2D('Discriminator.1',1,DIM,5,output,stride=2)
-    output = LeakyReLU(output)
-
-    output = lib.ops.conv2d.Conv2D('Discriminator.2', DIM, 2*DIM, 5, output, stride=2)
-    if MODE == 'wgan':
-        output = lib.ops.batchnorm.Batchnorm('Discriminator.BN2', [0,2,3], output)
-    output = LeakyReLU(output)
-
-    output = lib.ops.conv2d.Conv2D('Discriminator.3', 2*DIM, 4*DIM, 5, output, stride=2)
-    if MODE == 'wgan':
-        output = lib.ops.batchnorm.Batchnorm('Discriminator.BN3', [0,2,3], output)
-    output = LeakyReLU(output)
-
-    output = tf.reshape(output, [-1, 4*4*4*DIM])
-    output = lib.ops.linear.Linear('Discriminator.Output', 4*4*4*DIM, 1, output)
-
-    return tf.reshape(output, [-1])
-
 real_data = tf.placeholder(tf.float32, shape=[BATCH_SIZE, OUTPUT_DIM])
-fake_data = Generator(BATCH_SIZE)
+fake_data = Generator(BATCH_SIZE, DIM, OUTPUT_DIM)
 
-disc_real = Discriminator(real_data)
-disc_fake = Discriminator(fake_data)
+disc_real = Discriminator(real_data, DIM)
+disc_fake = Discriminator(fake_data, DIM)
 
 gen_params = lib.params_with_name('Generator')
 disc_params = lib.params_with_name('Discriminator')
 
-if MODE == 'wgan':
-    gen_cost = -tf.reduce_mean(disc_fake)
-    disc_cost = tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
 
-    gen_train_op = tf.train.RMSPropOptimizer(
-        learning_rate=5e-5
-    ).minimize(gen_cost, var_list=gen_params)
-    disc_train_op = tf.train.RMSPropOptimizer(
-        learning_rate=5e-5
-    ).minimize(disc_cost, var_list=disc_params)
-
-    clip_ops = []
-    for var in lib.params_with_name('Discriminator'):
-        clip_bounds = [-.01, .01]
-        clip_ops.append(
-            tf.assign(
-                var,
-                tf.clip_by_value(var, clip_bounds[0], clip_bounds[1])
-            )
-        )
-    clip_disc_weights = tf.group(*clip_ops)
-
-elif MODE == 'wgan-gp':
+if MODE == 'wgan-gp':
     gen_cost = -tf.reduce_mean(disc_fake)
     disc_cost = tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
 
@@ -142,7 +64,7 @@ elif MODE == 'wgan-gp':
     )
     differences = fake_data - real_data
     interpolates = real_data + (alpha*differences)
-    gradients = tf.gradients(Discriminator(interpolates), [interpolates])[0]
+    gradients = tf.gradients(Discriminator(interpolates, DIM), [interpolates])[0]
     slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), reduction_indices=[1]))
     gradient_penalty = tf.reduce_mean((slopes-1.)**2)
     disc_cost += LAMBDA*gradient_penalty
@@ -189,29 +111,55 @@ elif MODE == 'dcgan':
 
 # For saving samples
 fixed_noise = tf.constant(np.random.normal(size=(128, 128)).astype('float32'))
-fixed_noise_samples = Generator(128, noise=fixed_noise)
-def generate_image(frame, true_dist):
+fixed_noise_samples = Generator(128, DIM, OUTPUT_DIM, noise=fixed_noise)
+
+"""
+def generate_image(it):
     samples = session.run(fixed_noise_samples)
     lib.save_images.save_images(
         samples.reshape((128, 28, 28)),
-        'samples_{}.png'.format(frame)
+        'samples_{}.png'.format(it), SAVE_DIR
     )
+"""
+def generate_image(iteration, random=False):
+        if random is True:
+            random_noise = tf.constant(np.random.normal(size=(128, 128)).astype('float32'))
+            random_samples = Generator(128, DIM, OUTPUT_DIM, random_noise)
+            samples = session.run(random_samples)
+        else:
+            samples = session.run(fixed_noise_samples)
+        samples = ((samples+1.)*(255.99/2)).astype('int32')
+        samples = samples.reshape((128, 28, 28))
+        f = 'samples_{}.png'.format(iteration)
+        lib.save_images.save_images(samples, f, SAVE_DIR)
+
 
 # Dataset iterator
 train_gen, dev_gen, test_gen = lib.mnist.load(BATCH_SIZE, BATCH_SIZE)
+
+# train_gen, dev_gen, test_gen = lib.mnist_custom.load(BATCH_SIZE)
+
+
 def inf_train_gen():
     while True:
-        for images,targets in train_gen():
+        for images, labels in train_gen():
             yield images
+
 
 # Train loop
 with tf.Session() as session:
 
     session.run(tf.initialize_all_variables())
+    train_writer = tf.summary.FileWriter('./board/MNIST/train/'+str(TF_TRIAL),
+                                         session.graph)
+    test_writer = tf.summary.FileWriter('board/MNIST/test')
+
+    saver = tf.train.Saver()
+    saver.restore(session, MODEL_DIR+MODEL_NAME)
 
     gen = inf_train_gen()
 
-    for iteration in xrange(ITERS):
+    for iteration in xrange(START, ITERS):
         start_time = time.time()
 
         if iteration > 0:
@@ -236,7 +184,7 @@ with tf.Session() as session:
         # Calculate dev loss and generate samples every 100 iters
         if iteration % 100 == 99:
             dev_disc_costs = []
-            for images,_ in dev_gen():
+            for images, _ in dev_gen():
                 _dev_disc_cost = session.run(
                     disc_cost,
                     feed_dict={real_data: images}
@@ -244,10 +192,16 @@ with tf.Session() as session:
                 dev_disc_costs.append(_dev_disc_cost)
             lib.plot.plot('dev disc cost', np.mean(dev_disc_costs))
 
-            generate_image(iteration, _data)
+            generate_image(iteration, random=False)
+            generate_image(iteration+1, random=True)
 
         # Write logs every 100 iters
         if (iteration < 5) or (iteration % 100 == 99):
+            lib.plot.flush()
+
+        if iteration in SAVE_ITERS:
+            saver.save(session, MODEL_DIR+SAVE_NAME+'_'+str(iteration)+'_steps')
+        if (iteration < 5) or (iteration % 200 == 199):
             lib.plot.flush()
 
         lib.plot.tick()
