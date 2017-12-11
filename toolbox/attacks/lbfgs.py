@@ -9,11 +9,12 @@ import sys
 sys.path.append('../')
 # from tools.cifar_base import cifar_model
 from foolbox.criteria import TargetClass, Misclassification
+from foolbox.criteria import TopKMisclassification
 from keras.backend.tensorflow_backend import set_session
 
 
 def config_tf(gpu=0.5):
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     config = tf.ConfigProto()
     config.gpu_options.per_process_gpu_memory_fraction = gpu
     set_session(tf.Session(config=config))
@@ -30,7 +31,7 @@ def display_im(img, title=None):
 
 def load_model(weights=None, top=None, model=None):
     if model is not None:  # resnet
-        preprocessing = (np.array([103.939, 116.779, 123.68]), 1)
+        preprocessing = (np.array([103.939-1, 116.779-1, 123.68-1]), 127.5)
         fmodel = foolbox.models.KerasModel(model, bounds=(0, 255), preprocessing=preprocessing)
         return fmodel
     # kmodel = cifar_model(top=top, path=weights)
@@ -79,28 +80,34 @@ def build_attack(attack_str, model, criterion):
         return foolbox.attacks.DeepFoolAttack(model, criterion)
     if attack_str == 'lbfgs':
         return foolbox.attacks.LBFGSAttack(model, criterion)
+    if attack_str == 'fgsm':
+        return foolbox.attacks.GradientSignAttack(model, criterion)
     else:
         print "model not supported"
         sys.exit(0)
 
+
 def generate(model, image, targets):
 
     label = np.argmax(model.predictions(image))
-    print "label: ", label
+    # print "label: ", label
     if targets == 2 and label == 0:
         print "classified real as adversarial"
         return None
     target_class = get_target(label, targets)
     print "Target Class: {}".format(target_class)
-    #criterion = TargetClass(target_class)
+    # criterion = TargetClass(target_class)
     criterion = Misclassification()
+    # criterion = TopKMisclassification(k=3)
+
+    # attack = build_attack('fgsm', model, criterion)
+    attack = build_attack('lbfgs', model, criterion)
+    # attack = build_attack('deepfool', model, criterion)
+    # attack = foolbox.attacks.GradientAttack(model, criterion)
     try:
-        #attack = foolbox.attacks.LBFGSAttack(model, criterion)
-        attack = build_attack('deepfool', model, criterion)
-        # attack = foolbox.attacks.GradientAttack(model, criterion)
-    except:
+        adversarial = attack(image, label, unpack=False)
+    except ValueError:
         return None
-    adversarial = attack(image, label, unpack=False)
     return adversarial
     # return adversarial
     # except:

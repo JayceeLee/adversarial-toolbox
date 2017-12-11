@@ -50,8 +50,10 @@ def load_dir(paths, arr, start=0, end=0):
     for idx, i in enumerate(range(start, end)):
         image = imread(paths[idx], mode='RGB')
         image = imresize(image, imshape)
-        arr[i] = image.astype(np.float32)
+        a = image.astype(np.uint8)
+        arr[i] = a
     print "Loaded {} images".format(len(paths))
+
     return arr
 
 
@@ -75,13 +77,12 @@ def load_ilsvrc_labeled(n_images, im_dir, y_path, adv=False, fn_sorting=True):
         return parts
     paths = sorted(paths, key=numericalSort)
     images = np.empty((n_images, 224, 224, 3))
-    images = load_dir(paths[n_images:n_images*2],
+    images = load_dir(paths[:n_images],
                       images,
                       start=0,
                       end=n_images)
     images = preprocess(images, net='resnet')
-    labels = load_labels(n_images*2, y_path)
-    labels = labels[n_images:]
+    labels = load_labels(n_images, y_path)
     return images, labels
 
 

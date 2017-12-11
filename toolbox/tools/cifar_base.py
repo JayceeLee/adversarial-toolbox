@@ -22,6 +22,7 @@ model_name = 'keras_cifar10_trained_model.h5'
 def get_model(top='vanilla', shape=(32, 32, 3)):
     model = Sequential()
 
+    model.add(
     model.add(Conv2D(32, (3, 3), padding='same',
                      input_shape=shape))
     model.add(Activation('relu'))
@@ -160,3 +161,7 @@ def train():
         if predict_index == num_predictions:
             break
     return model
+
+if __name__ == '__main__':
+
+    model = train()
