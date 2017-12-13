@@ -29,11 +29,18 @@ def display_im(img, title=None):
     plt.show()
 
 
-def load_model(weights=None, top=None, model=None):
-    if model is not None:  # resnet
-        preprocessing = (np.array([103.939-1, 116.779-1, 123.68-1]), 127.5)
+def load_fmodel(model=None, net='resnet'):
+    
+    fmodel = None
+    
+    if net == 'resnet':  # resnet
+        preprocessing = (np.array([103.939, 116.779, 123.68]), 1)
         fmodel = foolbox.models.KerasModel(model, bounds=(0, 255), preprocessing=preprocessing)
-        return fmodel
+    elif net == 'ir':
+        fmodel = foolbox.models.KerasModel(model, bounds=(-1, 1))
+
+    return fmodel
+
     # kmodel = cifar_model(top=top, path=weights)
     # kmodel.summary()
     # fmodel = foolbox.models.KerasModel(kmodel, bounds=(0, 255))
@@ -95,17 +102,17 @@ def generate(model, image, targets):
         print "classified real as adversarial"
         return None
     target_class = get_target(label, targets)
-    print "Target Class: {}".format(target_class)
+    # print "Target Class: {}".format(target_class)
     # criterion = TargetClass(target_class)
     criterion = Misclassification()
     # criterion = TopKMisclassification(k=3)
 
     # attack = build_attack('fgsm', model, criterion)
-    attack = build_attack('lbfgs', model, criterion)
-    # attack = build_attack('deepfool', model, criterion)
+    # attack = build_attack('lbfgs', model, criterion)
+    attack = build_attack('deepfool', model, criterion)
     # attack = foolbox.attacks.GradientAttack(model, criterion)
     try:
-        adversarial = attack(image, label, unpack=False)
+        adversarial = attack(image, label)
     except ValueError:
         return None
     return adversarial
