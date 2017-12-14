@@ -28,7 +28,7 @@ save_dir_real = home+'/images/adversarials/deepfool/imagenet/symmetric/real'
 images_dir = home+'/images/imagenet12/fcn_train/'
 real_diff_dir = home+'/images/adversarials/deepfool/imagenet/symmetric/avg_real/'
 adv_diff_dir = home+'/images/adversarials/deepfool/imagenet/symmetric/avg_adv/'
-diff_dir = home+'/images/adversarials/deepool/imagenet/symmetric/diff/'
+diff_dir = home+'/images/adversarials/deepfool/imagenet/symmetric/diff/'
 wpath_base = home+'/toolbox/models/weights/detectors/deepfool/imagenet/iter_'
 wpath_init = 'iter0'
 start_iter = 0
@@ -165,12 +165,12 @@ def print_preds(kmodel, fmodel, kx, fx):
 
         print "Foolbox: ", fpred
         print "Keras  : ", kpred, klabel
-
+         
 
 def generate_adv(wpath, it):
 
-    num_gen = 0
-    start = 0
+    num_gen = 19999
+    start = 19999
     targets = 1000
     
     net = 'resnet'
@@ -183,8 +183,8 @@ def generate_adv(wpath, it):
 
     val_model = ResNet50(weights='imagenet')
     # val_model = InceptionResNetV2(weights='imagenet')
-    train = load_sorted(10000)
-    img_set = train[start:]
+    train = load_sorted(20000)
+    img_set = train
     idx = start
 
     for i, x in enumerate(img_set):
@@ -220,9 +220,9 @@ def generate_adv(wpath, it):
         print "Adversarial Norm: ", np.linalg.norm(real-x_adv)
         if validate_label(val_model, real) == validate_label(val_model, x_adv):
             print "FAILED with img: {}".format(idx)
+            print "-----------------------------------------"
             continue
         
-        num_gen += 1
         for d in [save_dir_real, save_dir_adv, diff_dir]:
             if not os.path.exists(d):
                 os.makedirs(d)
@@ -239,7 +239,16 @@ def generate_adv(wpath, it):
         
         valid = imread(save_str_adv)
         print "loaded ",  validate_label(val_model, valid, name=True)
+        if (validate_label(val_model, valid, name=False) ==
+            validate_label(val_model, real, name=False)):
+            print "FAILED: did not survive quantization"
+            os.remove(save_str_adv)
+            os.remove(save_str_real)
+            os.remove(save_str_diff)
+            print "-----------------------------------------"
+            continue
         
+        num_gen += 1
         print "SUCCESS, images saved {}".format(num_gen)
         print "Images attempted for this run: {}".format(i+1)
         print "-----------------------------------------"
