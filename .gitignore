@@ -102,6 +102,8 @@ box/
 ckpts/
 figures/
 samples/
+imgs/
+img_images/
 
 *.sh
 *.net
@@ -117,6 +119,13 @@ samples/
 *checkpoint
 images/
 weights/
+tmp/
 *.t7
 *.JPEG
 board/
+*.tar
+*.bz2
+*.png
+*.jpg
+*.gz
+
