@@ -1,7 +1,10 @@
+import os
+import gc
 import sys
 import cv2
 import gcnn
 import load_data
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -10,25 +13,28 @@ from glob import glob
 from imageio import imwrite
 from ResNet50 import ResNet50
 from keras.layers import Input
-from keras.models import Sequential
-# from fcn_models import DenseNet_FCN
-# from fcn_models import FCN_ResNet50
 from keras.layers.pooling import AveragePooling2D
 from keras.models import Model
 from keras.applications.resnet50 import preprocess_input
 from keras.applications.resnet50 import decode_predictions
 
 adv_weights = '../models/weights/detectors/lbfgs/imagenet/iter_0.h5'
-# adv_dir = '../../images/adversarials/lbfgs/imagenet/symmetric/test/adv'
-# adv_dir = '/home/neale/tmp/bilateral_lbfgs'
-adv_dir = '/home/neale/tmp/bilateral_fgsm'
-# real_images = '../../images/adversarials/lbfgs/imagenet/symmetric/test/real'
-# real_images = '/home/neale/tmp/bilateral_real'
-real_images = '/home/neale/tmp/bilateral_fgsm_real'
-# real_images = '../../images/imagenet12/recovery_set_all'
+adv_dir = '../../images/adversarials/fgsm/imagenet/symmetric/adv'
+real_dir = '../../images/adversarials/fgsm/imagenet/symmetric/real'
+
+save_adv = '../../images/adversarials/fgsm/imagenet/symmetric/bilateral_adv'
+save_real = '../../images/adversarials/fgsm/imagenet/symmetric/bilateral_real'
+
+def load_args():
+
+    parser = argparse.ArgumentParser(description='tools for recovering the image beneath an adversarial example')
+    parser.add_argument('-r', '--real_dir', default=real_dir, type=str, help='directory where PNG images are stored')
+    parser.add_argument('-a', '--adv_dir', default=adv_dir, type=str, help='directory of adversarial images')
+    args = parser.parse_args()
+    return args
 
 
-def predictions(model, x, proba=False, topk=0, prep=False):
+def predictions(model, x, proba=False, topk=1, prep=False):
 
     assert len(x) > 0
 
@@ -41,16 +47,16 @@ def predictions(model, x, proba=False, topk=0, prep=False):
             proba = model.predict(im)
             iset[i] = proba
     else:
-        iset = []
-        for im in x:
+        iset = np.empty((len(x), topk))
+        for i, im in enumerate(x):
             im = np.expand_dims(im, 0)
             if topk > 0:
                 preds = model.predict(im)
                 labels = np.argsort(-preds)[0][:topk]
-                iset.append(labels)
+                iset[i] = labels
             else:
                 label = np.argmax(model.predict(im))
-                iset.append(label)
+                iset[i] = label
 
     return iset
 
@@ -95,41 +101,54 @@ def load_recovery_model(bilateral=False):
     return model
 
 
-def load_symmetric():
-    real_paths = glob(real_images+'/*.png')
-    real_paths.sort(key=lambda f: int(filter(str.isdigit, f)))
-    paths_adv = glob(adv_dir+'/*.png')
+def load_symmetric(real, adv, n_images=None):
+    if n_images is None:
+        n_images = len(real) - 1
+    paths_real = glob(real+'/*.png')
+    paths_real.sort(key=lambda f: int(filter(str.isdigit, f)))
+    paths_adv = glob(adv+'/*.png')
     paths_adv.sort(key=lambda f: int(filter(str.isdigit, f)))
 
-    x_real = np.empty((len(real_paths), 224, 224, 3))
-    reals = load_data.load_dir(real_paths, arr=x_real, start=0, end=len(real_paths))
+    paths_real = paths_real[-n_images:]
+    paths_adv = paths_adv[-n_images:]
+    print paths_real[0]
+    print paths_adv[0]
+
+    x_real = np.empty((len(paths_real), 224, 224, 3))
+    real = load_data.load_dir(paths_real, arr=x_real, start=0, end=len(paths_real))
 
     x_adv = np.empty((len(paths_adv), 224, 224, 3))
-    x_adv = load_data.load_dir(paths_adv, arr=x_adv, start=0, end=len(paths_adv))
+    adv = load_data.load_dir(paths_adv, arr=x_adv, start=0, end=len(paths_adv))
 
-    """
-    reals = preprocess_input(reals)
-    adv = preprocess_input(x_adv)
-
-    return reals, adv
-    """
-    return reals, x_adv
+    return real, adv
 
 
-def load_fcn():
-    pass
+def bilateral_all_the_things(model, adv, real, k, s):
 
-
-def bilateral_all_the_things(model, adv, real):
-
-    kernel = 3
-    sigma = 35
-    adv_bilateral = bilateral(adv_good, kernel, sigma, sigma)
+    adv_bilateral = bilateral(adv_good, k, s, s)
+    if not os.path.exists(save_adv):
+            os.makedirs(save_adv)
+    if not os.path.exists(save_real):
+            os.makedirs(save_real)
     for i in range(len(adv_bilateral)):
-        imwrite('/home/neale/tmp/bilateral_fgsm/im_{}.png'.format(i), adv_bilateral[i])
-        imwrite('/home/neale/tmp/bilateral_fgsm_real/im_{}.png'.format(i), real[i])
+        imwrite(save_adv+'/im_{}.png'.format(i), adv_bilateral[i])
+        imwrite(save_real+'/im_{}.png'.format(i), real[i])
 
-    sys.exit(0)
+
+def get_norm(real, adv):
+
+    if real.shape != adv.shape:
+        raise ValueError("Both data sets must have the same shape, got {} and {}"
+                         .format(real.shape, adv.shape))
+    diff = real - adv
+    if diff.ndim == 3:
+        l = np.linalg.norm(diff)
+    if diff.ndim == 4:
+        l = 0.
+        for x in diff:
+            l += np.linalg.norm(x)
+        l /= len(diff)
+    return l
 
 
 def build_resistance_dict(model, real, adv):
@@ -190,19 +209,12 @@ def build_resistance_dict(model, real, adv):
     print "recovered: {} / {} ".format(total, len(real))
     sys.exit(0)
 
+
 if __name__ == '__main__':
 
-    real, adv = load_symmetric()
+    args = load_args()
+    real, adv = load_symmetric(args.real_dir, args.adv_dir, 100)
     model = load_vanilla_model()
-    build_resistance_dict(model, real, adv)
-
-    """
-    # test
-    print np.argmax(model.predict(np.expand_dims(real[0], 0)))
-    print np.argmax(model.predict(np.expand_dims(adv[0], 0)))
-    sys.exit(0)
-    """
-    from scipy.misc import imshow
 
     preds = predictions(model, real, prep=True)
     preds2 = predictions(model, adv, prep=True)
@@ -226,9 +238,11 @@ if __name__ == '__main__':
 
     preds = predictions(model, real_good, prep=True)
     preds2 = predictions(model, adv_good, prep=True)
-    top10 = predictions(model, real_good, proba=False, topk=10, prep=True)
-    top5 = predictions(model, real_good, proba=False, topk=5, prep=True)
 
+    top10 = predictions(model, real_good, proba=False, topk=5, prep=True)
+    top5 = predictions(model, real_good, proba=False, topk=2, prep=True)
+    print top10.shape
+    print top5.shape
     diff = 0
     bad_idx = []
     for i, (p_r, p_adv) in enumerate(zip(preds, preds2)):
@@ -237,64 +251,70 @@ if __name__ == '__main__':
         else:
             bad_idx.append(i)
     assert len(bad_idx) == 0
+    gc.collect()
 
-    bilateral_all_the_things(model, adv_good, real_good)
-    sys.exit(0)
-    # for x in real_good:
-    #     print np.max(model.predict(np.expand_dims(x, 0)))
+    # print get_norm(real_good, adv_good)
 
-    filters = [3, 4, 5, 7]
-    sigma_size = [25, 30, 35, 40]
+    filters = [2, 3, 5, 9, 11]
+    sigma_s = [15, 25, 30, 35, 45]
+    sigma_c = [15, 25, 30, 35, 45]
+    max_kernel = 3
+    max_sigma = 25
+    best_rate = 0
+    model_avg, model = load_recovery_model(bilateral=True)
     for f in filters:
-        for s in sigma_size:
-            print "f: {}, sc: {}, ss: {}".format(f, s, s)
-            model_avg, model = load_recovery_model(bilateral=True)
-            adv_good = adv_good.astype(np.uint8)
-            # adv_avg = predictions(model_avg, adv_good, proba=True)[:10]
-            adv_bilateral = bilateral(adv_good, f, s, s)
-            """
-            for i in range(5):
-                # plt.imshow(adv_good[i].astype(np.uint8))
-                # plt.show()
-                plt.imshow(adv_avg[i].astype(np.uint8))
-                plt.show()
-                imwrite('/home/neale/tmp/bilateral_lbfgs/avg_recovered_lbfgs_{}_{}.png'.format(i, f), adv_avg[i].astype(np.uint8))
-                imwrite('/home/neale/tmp/save/lbfgs_{}_{}.png'.format(i, f), adv_good[i])
-            """
-            # preds_rec = predictions(model, adv_avg, prep=True)
-            preds_rec = predictions(model, adv_bilateral, prep=True)
-            # preds_rec_10 = predictions(model, adv_avg, topk=10, prep=True)
-            preds_rec_10 = predictions(model, adv_bilateral, topk=10, prep=True)
+        for s in sigma_s:
+            for c in sigma_c:
+                adv_bilateral = 0.
+                adv_bilateral = bilateral(adv_good, f, s, s)
 
-            # for x in adv_bilateral:
-            #     print np.max(model.predict(np.expand_dims(x, 0)))
+                preds_rec = predictions(model, adv_bilateral, prep=True)
+                preds_rec_10 = predictions(model, adv_bilateral, topk=10, prep=True)
 
-            recovered_examples = 0
-            for i, (p_real, p_rec) in enumerate(zip(preds, preds_rec)):
-                if p_real == p_rec:
-                    recovered_examples += 1
+                # adv_avg = predictions(model_avg, adv_good, proba=True)[:10]
+                # preds_rec = predictions(model, adv_avg, prep=True)
+                # preds_rec_10 = predictions(model, adv_avg, topk=10, prep=True)
 
-            print "recovered top1 labeled examples: {}".format(recovered_examples)
-            print "top 1recovery rate: {}".format(float(recovered_examples)/len(preds))
+                recovered_examples_1 = 0.
+                for i, (p_real, p_rec) in enumerate(zip(preds, preds_rec)):
+                    if p_real == p_rec:
+                        recovered_examples_1 += 1
+                rate_1 = recovered_examples_1 / len(preds)
 
-            recovered_examples = 0
-            for i, (p_real, p_rec) in enumerate(zip(top5, preds_rec_10)):
-                if set(p_real) <= set(p_rec):
-                    recovered_examples += 1
-                else:
-                    pass
-                    """
-                    for x in p_real:
-                        if x not in p_rec:
-                            print x
-                            plt.imshow(real_good[i])
-                            plt.show()
-                            plt.imshow(adv_good[i])
-                            plt.show()
-                            plt.imshow(adv_bilateral[i])
-                            plt.show()
-                            break
-                    # print p_rec, p_real
-                    """
-            print "recovered top5 within top10 labeled examples: {}".format(recovered_examples)
-            print "top5 recovery rate: {}".format(float(recovered_examples)/len(preds))
+                recovered_examples_5 = 0.
+                for i, (p_real, p_rec) in enumerate(zip(top5, preds_rec_10)):
+                    if set(p_real) <= set(p_rec):
+                        recovered_examples_5 += 1
+                    else:
+                        pass
+                        """
+                        a = preprocess_input(np.expand_dims(adv_bilateral[i], 0).astype(np.float32))
+                        r = preprocess_input(np.expand_dims(real_good[i], 0).astype(np.float32))
+                        plt.figure()
+                        plt.subplot(1, 2, 1)
+                        plt.imshow(r[0])
+                        plt.subplot(1, 2, 2)
+                        plt.imshow(a[0])
+                        plt.suptitle("Could not recover")
+                        plt.show()
+                        """
+                rate_5 = recovered_examples_5 / len(preds)
+
+                print "kernel width: {}, color range: {}, spatial range: {}".format(f, c, s)
+                print "recovered top1 labeled examples: {}".format(recovered_examples_1)
+                print "top1 recovery rate: {}".format(rate_1)
+                print "recovered top5 within top10 labeled examples: {}".format(recovered_examples_5)
+                print "top5 recovery rate: {}".format(rate_5)
+                print "-----------------------------------------------------------"
+                if rate_5 > best_rate:
+                    best_rate = rate_5
+                    max_sigma = s
+                    max_kernel = f
+
+    print "* max recovery: {}".format(best_rate)
+    print "* max kernel width: {}".format(max_kernel)
+    print "* max signal range: {}".format(max_sigma)
+
+    if best_rate >= 0.90:
+        bilateral_all_the_things(model, adv_good, real_good, max_kernel, max_sigma)
+

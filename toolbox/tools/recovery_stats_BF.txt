@@ -1,0 +1,14 @@
+DEEPFOOL
+* max recovery: 0.944
+* max kernel width: 5
+* max signal range: 10
+
+LBFGS
+
+
+FGSM
+* max recovery: 0.913580246914
+* max kernel width: 9
+* max signal range: 15
+
+
