@@ -105,6 +105,7 @@ samples/
 imgs/
 img_images/
 
+*.ckpt
 *.sh
 *.net
 *.gz
