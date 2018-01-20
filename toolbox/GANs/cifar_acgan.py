@@ -1,7 +1,5 @@
-
 import os, sys
 sys.path.append(os.getcwd())
-
 import generators
 import discriminators
 import tflib as lib
@@ -24,7 +22,7 @@ import locale
 
 locale.setlocale(locale.LC_ALL, '')
 
-DATA_DIR = 'images/cifar-10-batches-py'
+DATA_DIR = '../../images/cifar-10-batches-py'
 
 DIM = 128
 BATCH_SIZE = 64  # Critic batch size
@@ -94,7 +92,7 @@ with tf.Session() as session:
             tf.cast(
                 tf.equal(
                     tf.to_int32(
-                        tf.argmax(disc_all_acgan[:BATCH_SIZE], dimension=1)),
+                        tf.argmax(disc_all_acgan[:BATCH_SIZE], axis=1)),
                     real_and_fake_labels[:BATCH_SIZE]
                 ),
                 tf.float32
@@ -104,7 +102,7 @@ with tf.Session() as session:
             tf.cast(
                 tf.equal(
                     tf.to_int32(
-                        tf.argmax(disc_all_acgan[BATCH_SIZE:], dimension=1)),
+                        tf.argmax(disc_all_acgan[BATCH_SIZE:], axis=1)),
                     real_and_fake_labels[BATCH_SIZE:]
                 ),
                 tf.float32
@@ -226,7 +224,7 @@ with tf.Session() as session:
             locale.format("%d", total_param_count, grouping=True)
         )
 
-    session.run(tf.initialize_all_variables())
+    session.run(tf.global_variables_initializer())
 
     gen = inf_train_gen()
 
@@ -239,9 +237,12 @@ with tf.Session() as session:
         for i in xrange(N_CRITIC):
             _data,_labels = gen.next()
             if CONDITIONAL and ACGAN:
-                _disc_cost, _disc_wgan, _disc_acgan, _disc_acgan_acc, _disc_acgan_fake_acc, _ = session.run([disc_cost, disc_wgan, disc_acgan, disc_acgan_acc, disc_acgan_fake_acc, disc_train_op], feed_dict={real_data_int: _data, real_labels:_labels, _iteration:iteration})
+                _disc_cost, _disc_wgan, _disc_acgan, _disc_acgan_acc, _disc_acgan_fake_acc, _ = session.run([disc_cost, 
+                    disc_wgan, disc_acgan, disc_acgan_acc, disc_acgan_fake_acc, disc_train_op],
+                    feed_dict={real_data_int: _data, real_labels:_labels, _iteration:iteration})
             else:
-                _disc_cost, _ = session.run([disc_cost, disc_train_op], feed_dict={real_data_int: _data, real_labels:_labels, _iteration:iteration})
+                _disc_cost, _ = session.run([disc_cost, disc_train_op],
+                    feed_dict={real_data_int: _data, real_labels:_labels, _iteration:iteration})
 
         lib.plot.plot('cost', _disc_cost)
         if CONDITIONAL and ACGAN:
@@ -260,7 +261,8 @@ with tf.Session() as session:
         if iteration % 100 == 99:
             dev_disc_costs = []
             for images, _labels in dev_gen():
-                _dev_disc_cost = session.run([disc_cost], feed_dict={real_data_int: images,real_labels:_labels})
+                _dev_disc_cost = session.run([disc_cost],
+                        feed_dict={real_data_int: images,real_labels:_labels})
                 dev_disc_costs.append(_dev_disc_cost)
             lib.plot.plot('dev_cost', np.mean(dev_disc_costs))
 

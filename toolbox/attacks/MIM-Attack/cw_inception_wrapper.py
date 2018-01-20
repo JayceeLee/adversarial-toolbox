@@ -117,11 +117,6 @@ class NodeLookup(object):
     return self.node_lookup[node_id]
 
 
-def print_graph():
-     a = [n.name for n in tf.get_default_graph().as_graph_def().node]
-     for item in a:
-          print (item)
-
 def create_graph():
   """Creates a graph from saved GraphDef file and returns a saver."""
   # Creates graph from saved graph_def.pb.
@@ -134,7 +129,6 @@ def create_graph():
     #  if "tensor_content" not in line:
     #    print(line)
     _ = tf.import_graph_def(graph_def, name='')
-    print_graph()
 
 
 def run_inference_on_image(image):

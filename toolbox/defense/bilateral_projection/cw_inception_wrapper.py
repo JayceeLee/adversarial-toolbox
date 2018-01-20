@@ -62,7 +62,7 @@ ilsvrc_dir = './imgs/'
 # imagenet_2012_challenge_label_map_proto.pbtxt:
 #   Text representation of a protocol buffer mapping a label to synset ID.
 tf.app.flags.DEFINE_string(
-    'model_dir', 'tmp/imagenet',
+    'model_dir', 'models/tmp',
     """Path to classify_image_graph_def.pb, """
     """imagenet_synset_to_human_label_map.txt, and """
     """imagenet_2012_challenge_label_map_proto.pbtxt.""")
@@ -117,11 +117,6 @@ class NodeLookup(object):
     return self.node_lookup[node_id]
 
 
-def print_graph():
-     a = [n.name for n in tf.get_default_graph().as_graph_def().node]
-     for item in a:
-          print (item)
-
 def create_graph():
   """Creates a graph from saved GraphDef file and returns a saver."""
   # Creates graph from saved graph_def.pb.
@@ -134,7 +129,6 @@ def create_graph():
     #  if "tensor_content" not in line:
     #    print(line)
     _ = tf.import_graph_def(graph_def, name='')
-    print_graph()
 
 
 def run_inference_on_image(image):

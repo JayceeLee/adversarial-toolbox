@@ -1,0 +1,6 @@
+ImageNet
+  inception v3:
+    -cw: .99 top1, .99 top5
+         kernel: 5, sigma: 25
+
+    -fgsm: 
