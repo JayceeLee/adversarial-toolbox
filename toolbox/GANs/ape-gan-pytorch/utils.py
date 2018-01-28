@@ -4,7 +4,7 @@ import numpy as np
 from data import mnist
 from data import cifar10
 from scipy.misc import imsave
-from ppmimage import show as ppmshow
+import matplotlib.pyplot as plt
 
 
 def dataset_iterator(args):
@@ -36,7 +36,7 @@ def generate_image(iter, model, save_path, batch_size):
     if datashape == (28, 28, 1):
         samples = samples.view(batch_size, 28, 28)
     else:
-        samples = samples.view(-1, *datashape)
+        samples = samples.view(-1, *(datashape[::-1]))
         samples = samples.mul(0.5).add(0.5)
     samples = samples.cpu().data.numpy()
     save_images(samples, save_path+'/samples_{}.jpg'.format(iter))
@@ -44,6 +44,7 @@ def generate_image(iter, model, save_path, batch_size):
 
 def save_images(X, save_path, use_np=False):
     # [0, 1] -> [0,255]
+    plt.ion()
     if not use_np:
         if isinstance(X.flatten()[0], np.floating):
             X = (255.99*X).astype('uint8')
@@ -66,9 +67,11 @@ def save_images(X, save_path, use_np=False):
         j = int(n/nw)
         i = int(n%nw)
         img[j*h:j*h+h, i*w:i*w+w] = x
-    
-    ppmshow(img)
-    
+
+    plt.imshow(img, cmap='gray')
+    plt.draw()
+    plt.pause(0.001)
+
     if use_np:
         np.save(save_path, img)
     else:

@@ -3,12 +3,14 @@ import sys
 import time
 import argparse
 import numpy as np
+from scipy.misc import imshow
+
 import torch
 import torchvision
 from torch import nn
 from torch import autograd
 from torch import optim
-from scipy.misc import imshow
+from torch.nn import functional as F
 
 import ops
 import plot
@@ -34,23 +36,26 @@ def load_models(args):
     if args.dataset == 'mnist':
         netG = generators.MNISTgenerator(args).cuda()
         netD = discriminators.MNISTdiscriminator(args).cuda()
+        netE = encoders.MNISTencoder(args).cuda()
 
     if args.dataset == 'cifar10':
         netG = generators.CIFARgenerator(args).cuda()
         netD = discriminators.CIFARdiscriminator(args).cuda()
+        netE = encoders.CIFARencoder(args).cuda()
 	
-    print (netG, netD)
-    return (netG, netD)
+    print (netG, netD, netE)
+    return (netG, netD, netE)
 
 
 def train():
     args = load_args()
     train_gen, dev_gen, test_gen = utils.dataset_iterator(args)
     torch.manual_seed(1)
-    netG, netD = load_models(args)
+    netG, netD, netE = load_models(args)
 
     optimizerD = optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
     optimizerG = optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+    optimizerE = optim.Adam(netE.parameters(), lr=1e-4, betas=(0.5, 0.9))
     one = torch.FloatTensor([1]).cuda()
     mone = (one * -1).cuda()
 
@@ -71,13 +76,13 @@ def train():
             _data = next(gen)
             # imshow(_data[0].reshape((28, 28)))
             """train with real data"""
-            if args.dataset != 'mnist':
+            if args.dataset == 'cifar10':
                 datashape = netG.shape[::-1]
                 netD.zero_grad()        
                 _data = _data.reshape(args.batch_size, *datashape).transpose(0, 2, 3, 1)
                 real_data = torch.stack([preprocess(item) for item in _data]).cuda()
                 real_data_v = autograd.Variable(real_data)
-            else:
+            elif args.dataset == 'mnist':
                 real_data = torch.Tensor(_data).cuda()
                 real_data_v = autograd.Variable(real_data)
                 netD.zero_grad()

@@ -1,6 +1,9 @@
 import sys
 import re, itertools
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import PIL
+import numpy as np
 sep = re.compile("[ \t\r\n]+")
 
 def chunks(iterable,size):
@@ -32,8 +35,12 @@ class Image:
 image_to_ansi = __import__("image-to-ansi") # __import__ because of minuses in filename. From https://gist.github.com/1687427
 
 def show(x):
+    if x.ndim == 2:
+        x = np.repeat(x[:, :, np.newaxis], 3, axis=2)
     im = x # use Image.open from PIL if using PIL
-    im = PIL.Image.fromarray(np.uint8(cm.gist_earth(img)*255))
+    print (im.shape)
+    im = PIL.Image.fromarray(im.astype(np.uint8), 'RGB')
+    im.show()
     for y in range(im.size[1]):
         for x in range(im.size[0]):
             p = im.getpixel((x, y))

@@ -9,19 +9,15 @@ from scipy.misc import imsave
 def calc_gradient_penalty(args, model, real_data, gen_data):
     batch_size = args.batch_size
     datashape = model.shape
-    # print (datashape)
     alpha = torch.rand(batch_size, 1)
     if args.dataset == 'mnist':
         alpha = alpha.expand(real_data.size()).cuda()
-        print (alpha.size())
     else:
         alpha = alpha.expand(batch_size, int(real_data.nelement()/batch_size))
-        alpha = alpha.contiguous().view(batch_size, *datashape).cuda()
-
+        alpha = alpha.contiguous().view(batch_size, *(datashape[::-1])).cuda()
     interpolates = alpha * real_data + ((1 - alpha) * gen_data)
     interpolates = interpolates.cuda()
     interpolates = autograd.Variable(interpolates, requires_grad=True)
-
     disc_interpolates = model(interpolates)
     gradients = autograd.grad(outputs=disc_interpolates, 
             inputs=interpolates,
