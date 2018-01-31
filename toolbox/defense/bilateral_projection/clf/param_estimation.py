@@ -17,9 +17,10 @@ os.environ['CUDA_VISIBLE_DEVICES']='1'
 
 
 def load_params():
-    x = np.load('./inception_v3_mim_500_params.npy')
-    assert x.shape == (500, 3)
-    return x
+    x = np.load('./resnet_v2_mim_500_images.npy')
+    print x.shape
+    y = np.load('./resnet_v2_mim_500_params.npy')
+    return (x, y)
 
 
 def collect_gradients(data, arr, c=1):
@@ -59,8 +60,7 @@ def collect_gradients(data, arr, c=1):
     return arr
 
 
-rimages, images = load_images('mim', 'imagenet', 'inception_v3', n=500)
-labels = load_params()
+images, labels = load_params()
 
 print images.shape
 print labels.shape
@@ -80,7 +80,7 @@ flat_x = np.zeros(len(images))
 for i in range(len(x_grad)):
     flat_x[i] = np.linalg.norm(x_grad[i])
 
-x_train = flat_x[:400]
+x_train = flat_x[:len(flat_x)400]
 x_test = flat_x[400:]
 y_train = labels[:400]
 y_test = labels[400:]

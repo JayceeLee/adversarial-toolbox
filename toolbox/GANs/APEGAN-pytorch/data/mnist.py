@@ -22,7 +22,6 @@ def mnist_generator(data, batch_size, n_labelled, limit=None):
         labelled[:n_labelled] = 1
 
     def get_epoch():
-        print (len(images), len(targets))
         rng_state = np.random.get_state()
         np.random.shuffle(images)
         np.random.set_state(rng_state)

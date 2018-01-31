@@ -3,6 +3,7 @@ import torch.autograd as autograd
 import numpy as np
 from data import mnist
 from data import cifar10
+from data import imagenet
 from scipy.misc import imsave
 import matplotlib.pyplot as plt
 
@@ -13,6 +14,10 @@ def dataset_iterator(args):
     if args.dataset == 'cifar10':
         data_dir = '../../../images/cifar-10-batches-py/'
         train_gen, dev_gen = cifar10.load(args.batch_size, data_dir)
+        test_gen = None
+    if args.dataset == 'imagenet':
+        data_dir = '../../../images/imagenet12/imagenet224/'
+        train_gen, dev_gen = imagenet.load(args.batch_size, data_dir)
         test_gen = None
 
     return (train_gen, dev_gen, test_gen)
@@ -25,15 +30,43 @@ def inf_train_gen(train_gen):
             yield images
 
 
-def generate_image(iter, model, save_path, batch_size):
-    datashape = model.shape
-    if datashape == (28, 28, 1):
-        fixed_noise_128 = torch.randn(batch_size, 128).cuda()
+def generate_ae_image(iter, netE, netG, save_path, args, real_data):
+    batch_size = args.batch_size
+    datashape = netE.shape
+    encoding = netE(real_data)
+    samples = netG(encoding)
+    if netG._name == 'mnistG':
+        samples = samples.view(batch_size, 28, 28)
     else:
-        fixed_noise_128 = torch.randn(128, 128).cuda()
+        samples = samples.view(-1, *(datashape[::-1]))
+        samples = samples.mul(0.5).add(0.5)
+    samples = samples.cpu().data.numpy()
+    save_images(samples, save_path+'/ae_samples_{}.jpg'.format(iter))
+
+
+def generate_sr_image(iter, netG, save_path, args, real_data):
+    batch_size = args.batch_size
+    datashape = netG.shape
+    samples = netG(real_data)
+    if netG._name == 'mnistG':
+        samples = samples.view(batch_size, 28, 28)
+    else:
+        samples = samples.view(-1, *datashape)
+        samples = samples.mul(0.5).add(0.5)
+    samples = samples.cpu().data.numpy()
+    save_images(samples, save_path+'/ae_samples_{}.jpg'.format(iter))
+
+
+def generate_image(iter, model, save_path, args):
+    batch_size = args.batch_size
+    datashape = model.shape
+    if model._name == 'mnistG':
+        fixed_noise_128 = torch.randn(batch_size, args.dim).cuda()
+    else:
+        fixed_noise_128 = torch.randn(128, args.dim).cuda()
     noisev = autograd.Variable(fixed_noise_128, volatile=True)
     samples = model(noisev)
-    if datashape == (28, 28, 1):
+    if model._name == 'mnistG':
         samples = samples.view(batch_size, 28, 28)
     else:
         samples = samples.view(-1, *(datashape[::-1]))

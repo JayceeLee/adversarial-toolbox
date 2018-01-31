@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+import collections
 from glob import glob
 from pprint import pprint
 from imageio import imwrite
@@ -19,6 +20,8 @@ import tf_models
 from srgan import superres
 from cw_inception_wrapper import InceptionModel
 
+from deep_image_prior import test_denoise
+
 slim = tf.contrib.slim
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0' 
@@ -26,6 +29,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 adv_root = '../../../images/adversarials'
 model_loaded = False
 BATCH_SIZE = 32
+
+label_counts = collections.defaultdict(int)
 
 def load_args():
 
@@ -214,38 +219,72 @@ def pyramidal_bf(arr):
 
     return filtered
 
-""" 
+"""
+
 should return percentage of images that can be recovered 
 with a bilateral filter, using a grid search across:
 kernel, color range, space range
 """
-"""
 def search_params(x, y, model, max_depth, level=1):
 
-    kernel_range = [1, 2, 3, 5, 7, 9, 15, 20, 25, 30, 40, 50, 60]
-    sigma_color_range = [1, 3, 5, 10, 15, 25, 40, 50, 75, 100, 150]
-    sigma_space_range = [1, 3, 5, 10, 15, 25, 40, 50, 75, 100, 150]
-    
-    def search(params, level):
-        if level > max_depth:
-            return params
-        for k_w in kernel_range:
-            for s_c in sigma_color_range:
-                for s_s in sigma_space_range:
-                    z = cv2.bilateralFilter(x, k_w, s_c, s_s)
-                    pred = np.argmax(model.predict(np.expand_dims(z, 0)))
-                    predy = np.argmax(model.predict(np.expand_dims(y, 0)))
-                    if (pred >= predy-1) and (pred <= predy + 1):
-                        zy = cv2.bilateralFilter(y, k_w, s_c, s_s)
-                        norm = np.linalg.norm(z - zy)
-                        return (k_w, s_c, s_s, norm)
-                    else:
-                        res = search((None, None, None, None), level+1)
+    kernel_range = [3]
+    sigma_color_range = [0.5, 1]
+    sigma_space_range = [.5, 3, 5, 10, 15, 25]
+    # sigma_space_range = [.5, 3, 5, 10, 15, 25]
+    lp = []
+    #def search(params, level):
+        #if level > max_depth:
+        #    return params
+    for k_w in kernel_range:
+        for s_c in sigma_color_range:
+            for s_s in sigma_space_range:
+                noise = np.random.normal(0, .05, (299, 299, 3)).astype(np.float32)
+                x = x + noise
+                z = cv2.bilateralFilter(x, k_w, s_c, s_s)
+                pred = np.argmax(model.predict(np.expand_dims(z, 0)))
+                predy = np.argmax(model.predict(np.expand_dims(y, 0)))
+                if (pred >= predy-1) and (pred <= predy + 1):
+                    # zy = cv2.bilateralFilter(y, k_w, s_c, s_s)
+                    # norm = np.linalg.norm(z - zy)
+                    lp.append((k_w, s_c, s_s))
+                    return lp # return single config for classification
+                # else:
+                #     res = search((None, None, None, None), level+1)
 
+    return lp
     params = search((None, None, None, None), level)
     if params is None:
         params = (None, None, None, None)
     return params
+
+
+def search_params2(x, y, model, max_depth, level=1):
+
+    global label_counts
+    kernel_range = [5, 7, 20, 25, 30, 40, 50, 60]
+    sigma_color_range = [0.5, 1]
+    sigma_space_range = [3, 5, 10, 15, 25, 40, 50, 75, 100]
+    default = None
+    for k_w in kernel_range:
+        for s_c in sigma_color_range:
+            for s_s in sigma_space_range:
+                z = cv2.bilateralFilter(x, k_w, s_c, s_s)
+                pred = np.argmax(model.predict(np.expand_dims(z, 0)))
+                predy = np.argmax(model.predict(np.expand_dims(y, 0)))
+                if pred == predy:
+                    # check if we've exceed the max count for a label
+                    label = '{}-{}-{}'.format(k_w, s_c, s_s)
+                    if label_counts[label] > 50:
+                        continue
+                    else:
+                        label_counts[label] += 1
+                    return (k_w, s_c, s_s)
+                # else:
+                #     res = search((None, None, None, None), level+1)
+
+
+    return default
+
 
 def test_bf_params(real, adv, model, sess):
     hits = 0.
@@ -253,45 +292,48 @@ def test_bf_params(real, adv, model, sess):
     real = real[start:]
     adv = adv[start:]
     param_count = defaultdict(int)
-    params = np.zeros((len(adv), 3))
+    param_set = np.empty((1, 3))
+    adv_set = np.empty((1, 299, 299, 3))
     for i, (r, a) in enumerate(zip(real, adv)):
         i = i + start
         print "Image {}".format(i)
-        r = r.astype(np.float32)
-        a = a.astype(np.float32)
+        rf = r.astype(np.float32)
+        af = a.astype(np.float32)
         #return smallest params because we perfer to retain information
-        res = search_params(a, r, model, max_depth=1)
-        if res[0] is None:
-            res = np.array([0, 0, 0])
+        res = search_params(af, rf, model, max_depth=1)
+        if len(res) == 0:
             print "No workable params within search space" 
         else:
             hits += 1
-            k, sc, ss, norm = res
-            res = np.array(res[:3])
-            param_str = "{}-{}-{}".format(str(k), str(sc), str(ss))
-            param_count[param_str] += 1
-            print "Found params for image {}: ({}, {}, {}), norm: {}".format(i, k, sc, ss, norm)
+            print "{} working params for image".format(len(res))
+            for params in res:
+                k, sc, ss = params
+                params = np.array(params)
+                param_str = "{}-{}-{}".format(str(k), str(sc), str(ss))
+                param_count[param_str] += 1
+                param_set = np.append(param_set, np.expand_dims(params, 0), axis=0)
+                adv_set = np.append(adv_set, np.expand_dims(a, 0), axis=0)
+        # pprint(dict(param_count))
+        print adv_set.shape
 
-        params[i] = res
-        print "saved ", params[i]
         print "---------------------------------------------"
-
     print "Found params for: {}% of images".format(hits/(len(adv)-start))
     print "Full paramater count: "
     pprint(dict(param_count))
-    np.save(model._name+'_mim_500_params', params)
+    np.save(model._name+'_mim_500_params', param_set)
+    np.save(model._name+'_mim_500_images', adv_set)
     sys.exit(0)
-"""
 
-def test_bf_params(real, adv, model, sess):
+
+
+def test_bf_params2(real, adv, model, sess):
     start = 0
     real = real[start:]
     adv = adv[start:]
     param_count = defaultdict(int)
     params = np.zeros((len(adv), 3))
 
-    #kernel_range = [3, 5, 7, 9, 15, 20, 25, 30, 40, 50, 60]
-    kernel_range = [15, 20, 25, 30, 40, 50, 60]
+    kernel_range = [3, 5, 7, 9, 15, 20, 25, 30, 40, 50, 60]
     sigma_color_range = [.5, 1, 3, 5, 10, 15, 25, 40]
     sigma_space_range = [.5, 1, 3, 5, 10, 15, 25, 40, 50, 75, 100]
 
@@ -317,7 +359,33 @@ def test_bf_params(real, adv, model, sess):
     pprint(dict(param_count))
     np.save(model._name+'_mim_500_params', params)
     sys.exit(0)
-             
+
+
+def test_dip(real, adv, model, sess):
+    start = 0
+    real = real[start:]
+    adv = adv[start:]
+#if
+    get_mean_norm(real, adv)
+#3ndif
+    import scipy.misc
+    hit = 0
+    for i, (r, a) in enumerate(zip(real, adv)):
+        mask = test_denoise.run(a)
+        a_small = scipy.misc.imresize(a, (288, 288, 3))
+        labely = np.argmax(model.predict(np.expand_dims(r, 0)))
+        dip = a_small - mask
+        dip = scipy.misc.imresize(dip, (299, 299, 3))
+        labelx = np.argmax(model.predict(np.expand_dims(dip, 0)))
+        if labelx == labely:
+            hit += 1
+            print ("hit")
+        else:
+            print ("miss: {} -> {}".format(labelx, labely))
+    print ("hits: {}%".format(float(hit)/len(adv)))
+    sys.exit(0)
+
+
 def get_norm(real, adv):
 
     if real.shape != adv.shape:
@@ -332,6 +400,15 @@ def get_norm(real, adv):
             l += np.linalg.norm(x)
         l /= len(diff)
     return l
+
+def get_mean_norm(real, adv, ord=2):
+
+    for i, (r, a) in enumerate(zip(real, adv)):
+        print (r-a).shape
+        #l1 = np.linalg.norm(r - a, ord='nuc')
+        l2 = np.linalg.norm(r - a, ord='fro')
+        linf = np.linalg.norm(r - a, ord=np.inf)
+        print ('{}, {}'.format(l1, l2, linf))
 
 
 def show(real, adv, model=None, sess=None, i=None):
@@ -400,9 +477,12 @@ if __name__ == '__main__':
     else: cw = False
     tf.set_random_seed(1234)
     graph = tf.Graph()
-    sess = tf.Session(graph=graph)
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    sess = tf.Session(config=config, graph=graph)
     model = load_model(graph, sess, args.model, n_classes)
 
+    # test_dip(real, adv, model, sess)
     test_bf_params(real, adv, model, sess)
     # vanilla differences
     # weed out non adversarials
@@ -459,41 +539,6 @@ if __name__ == '__main__':
     print "recovered top5 within top10 labeled examples: {}".format(n_recovered_5)
     print "top5 recovery rate: {}".format(rate_5)
     print "-----------------------------------------------------------"
-    sys.exit(0)
-    
-
-
-    for f in filters:
-        for s in sigma_s:
-            c = s
-            adv_bilateral = 0.
-            adv_bilateral = bilateral(adv_good, f, c, s)
-
-            preds_rec = predictions_tf(graph, sess, model, adv_bilateral, 1)
-            preds_rec_5 = predictions_tf(graph, sess, model, adv_bilateral, 4)
-            
-            # adv_avg = predictions(model_avg, adv_good, proba=True)[:10]
-            # preds_rec = predictions(model, adv_avg, prep=True)
-            # preds_rec_10 = predictions(model, adv_avg, topk=10, prep=True)
-
-            rate_1, rate_5 = rate((preds, preds_rec), (preds5, preds_rec_5))
-            n_recovered_1 = rate_1 * len(preds)
-            n_recovered_5 = rate_5 * len(preds)
-            print "kernel width: {}, color range: {}, spatial range: {}".format(f, c, s)
-            print "recovered top1 labeled examples: {}".format(n_recovered_1)
-            print "top1 recovery rate: {}".format(rate_1)
-            print "recovered top5 within top10 labeled examples: {}".format(n_recovered_5)
-            print "top5 recovery rate: {}".format(rate_5)
-            print "-----------------------------------------------------------"
-            if rate_5 > best_rate:
-                best_rate = rate_5
-                max_sigma = s
-                max_kernel = f
-
-    print "* max recovery: {}".format(best_rate)
-    print "* max kernel width: {}".format(max_kernel)
-    print "* max signal range: {}".format(max_sigma)
-
     if best_rate >= 0.90:
         bilateral_save(model, adv_good, real_good, max_kernel, max_sigma)
 

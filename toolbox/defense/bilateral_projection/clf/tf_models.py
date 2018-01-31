@@ -18,7 +18,6 @@ class InceptionV3Model(object):
         self.num_classes = 1001
         self.image_size = 299
         self.num_channels = 3
-        self.sal = False
         self.built = False
         self.ckpt_loaded = False
         self.input = tf.placeholder(tf.float32, (None, 299, 299, 3))
@@ -37,20 +36,19 @@ class InceptionV3Model(object):
         probs = output.op.inputs[0]
         return probs
 
-    def _build(self, sal=False):
-        self.sal = True if sal else False
+    def _build(self):
         reuse = True if self.built else None
         with slim.arg_scope(inception_v3.inception_v3_arg_scope()):
             logits, end_points = inception_v3.inception_v3(
                     self.input, num_classes=self.num_classes, is_training=False,
                     reuse=reuse)
             self.built = True
-            self.end_points = end_points
-            self.logits = logits
-            if not self.ckpt_loaded:
-                saver = tf.train.Saver(slim.get_model_variables())
-                saver.restore(self.sess, ckpt_dir + 'inception_v3.ckpt')
-                self.ckpt_loaded = True
+        self.end_points = end_points
+        self.logits = logits
+        if not self.ckpt_loaded:
+            saver = tf.train.Saver(slim.get_model_variables())
+            saver.restore(self.sess, ckpt_dir + 'inception_v3.ckpt')
+            self.ckpt_loaded = True
 
     def _free(self):
         self.sess.close()

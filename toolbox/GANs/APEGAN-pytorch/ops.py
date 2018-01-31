@@ -5,7 +5,6 @@ import torch.autograd as autograd
 from scipy.misc import imsave
 
 
-
 def calc_gradient_penalty(args, model, real_data, gen_data):
     batch_size = args.batch_size
     datashape = model.shape
@@ -30,6 +29,3 @@ def calc_gradient_penalty(args, model, real_data, gen_data):
         gradients = gradients.view(gradients.size(0), -1)
     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * args.gp
     return gradient_penalty
-
-
-
