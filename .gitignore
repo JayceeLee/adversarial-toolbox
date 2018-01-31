@@ -130,3 +130,5 @@ board/
 *.jpg
 *.gz
 *.graph
+*.npy
+*.pth
