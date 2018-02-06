@@ -2,135 +2,75 @@ import numpy as np
 from torch import nn
 from torch.nn import functional as F
 
-class CIFARgenerator(nn.Module):
-    def __init__(self, args):
-        super(CIFARgenerator, self).__init__()
-        self._name = 'cifarG'
-        self.shape = (32, 32, 3)
-        self.dim = args.dim
-        preprocess = nn.Sequential(
-                nn.Linear(self.dim, 4 * 4 * 4 * self.dim),
-                #nn.BatchNorm2d(4 * 4 * 4 * self.dim),
-                nn.ReLU(True)
-                )
-        block1 = nn.Sequential(
-                nn.ConvTranspose2d(4 * self.dim, 2 * self.dim, 2, stride=2),
-                nn.Dropout(p=0.3),
-                #nn.BatchNorm2d(2 * self.dim),
-                nn.ReLU(True)
-                )
-        block2 = nn.Sequential(
-                nn.ConvTranspose2d(2 * self.dim, self.dim, 2, stride=2),
-                nn.Dropout(p=0.3),
-                #nn.BatchNorm2d(self.dim),
-                nn.ReLU(True)
-                )
-        deconv_out = nn.ConvTranspose2d(self.dim, 3, 2, stride=2)
 
-        self.preprocess = preprocess
-        self.block1 = block1
-        self.block2 = block2
-        self.deconv_out = deconv_out
-        self.tanh = nn.Tanh()
+class convblock(nn.module):
+    def __init__(self, in_c, out_c, strides=(1, 1)):
+        super(convblock, self).__init__()
+        self.stride1 = strides[0]
+        self.stride2 = strides[1]
 
-    def forward(self, input):
-        output = self.preprocess(input)
-        output = output.view(-1, 4 * self.dim, 4, 4)
-        output = self.block1(output)
-        output = self.block2(output)
-        output = self.deconv_out(output)
-        output = self.tanh(output)
-        return output.view(-1, 3, 32, 32)
+        block = nn.Sequential(
+                nn.Conv2d(in_c, out_c, 3, stride=self.stride1, padding=1),
+                # nn.BatchNorm2d(out_ch),
+                nn.LeakyReLU(inplace=True),
+                nn.Conv2d(out_c, out_c, 3, stride=self.stride2, padding=1),
+                # nn.BatchNorm2d(out_ch), 
+                nn.LeakyReLU(inplace=True)
+                )
+        self.block = block
+    
+    def forward(self, x):
+        x = self.block(x)
+        return x
 
 
-class MNISTgenerator(nn.Module):
-    def __init__(self, args):
-        super(MNISTgenerator, self).__init__()
-        self._name = 'mnistG'
-        self.dim = args.dim
-        self.in_shape = int(np.sqrt(args.dim))
-        self.shape = (self.in_shape, self.in_shape, 1)
-        preprocess = nn.Sequential(
-                nn.Linear(self.dim, 4*4*4*self.dim),
-                nn.ReLU(True),
-                )
-        block1 = nn.Sequential(
-                nn.ConvTranspose2d(4*self.dim, 2*self.dim, 5),
-                nn.ReLU(True),
-                )
-        block2 = nn.Sequential(
-                nn.ConvTranspose2d(2*self.dim, self.dim, 5),
-                nn.ReLU(True),
-                )
-        deconv_out = nn.ConvTranspose2d(self.dim, 1, 8, stride=2)
-        self.block1 = block1
-        self.block2 = block2
-        self.deconv_out = deconv_out
-        self.preprocess = preprocess
-        self.sigmoid = nn.Sigmoid()
+class upblock(nn.Module):
+    def __init__(self, in_c, out_c, bilinear=True):
+        super(upblock, self).__init__()
 
-    def forward(self, input):
-        output = self.preprocess(input)
-        #output = F.dropout(output, p=0.3, training=self.training)
-        output = output.view(-1, 4*self.dim, 4, 4)
-        output = self.block1(output)
-        #output = F.dropout(output, p=0.3, training=self.training)
-        output = output[:, :, :7, :7]
-        output = self.block2(output)
-        #output = F.dropout(output, p=0.3, training=self.training)
-        output = self.deconv_out(output)
-        output = self.sigmoid(output)
-        return output.view(-1, 784)
+        if bilinear:
+            self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
+        else:
+            self.upsample = nn.ConvTranspose2d(in_c, out_c, 2, stride=2)
 
-class genResNet(nn.Module):
+        self.convblock = convblock(in_c, out_c)
+
+    def forward(self, x1, x2):
+        x1 = self.upsample(x1)
+        dx = x1.size()[2] - x2.size()[2]
+        dy = x1.size()[3] - x2.size()[3]
+        x2 = F.pad(x2, (dx//2, int(dx/2), dy//2, int(dy/2)))
+        x = torch.cat([x2, x1], dim=1)
+        x = self.convblock(x)
+        return x
+
+
+class UNet(nn.Module):
     def __init__(self, args, shape):
-        super(genResNet, self).__init__()
-        BN = args.batchnorm
-        self._name = 'resnetG'
-        self.dim = args.dim
-        self.n_resblocks = 16
-        self.in_shape = int(np.sqrt(args.dim))
+        super(UNet, self).__init__()
+        self._name = 'unetG'
         self.shape = shape
-
-        convblock_init = nn.Sequential(
-                nn.Conv2d(3, 64, 9, stride=1, padding=4),
-                nn.PReLU()
-                )
-
-        convbn = nn.Sequential(
-                nn.Conv2d(64, 64, 3, stride=1, padding=1),
-                nn.BatchNorm2d(64)
-                )
-               
-        convblock_lg = nn.Sequential(
-                nn.Conv2d(64, 256, 3, stride=1, padding=1),
-                #nn.PixelShuffle(2),
-                nn.PReLU(),
-                nn.Conv2d(256, 256, 3, stride=1, padding=1),
-                #nn.PixelShuffle(2),
-                nn.PReLU(),
-                nn.Conv2d(256, 3, 9, stride=1, padding=4)
-                )
-
-        resblock = nn.Sequential(
-                nn.Conv2d(64, 64, 3, stride=1, padding=1),
-                nn.BatchNorm2d(64),
-                nn.PReLU(),
-                nn.Conv2d(64, 64, 3, stride=1, padding=1),
-                nn.BatchNorm2d(64)
-                )
         
-        self.convbn = convbn
-        self.convblock = convblock_init
-        self.convblock_lg = convblock_lg
-        self.resblock = resblock
+        self.init = convblock(3, 64)
+        self.enc1 = convblock(63, 128, (2, 1))
+        self.enc2 = convblock(128, 256, (2, 1))
+        self.enc3 = convblock(256, 512, (2, 1))
+        self.enc4 = convblock(512, 512, (2, 1))
+        self.dec4 = upblock(1024, 256)
+        self.dec3 = upblock(512, 128)
+        self.dec2 = upblock(256, 64)
+        self.dec1 = upblock(128, 64)
+        self.out = convblock(64, 3)
 
-    def forward(self, input):
-        init = self.convblock(input)
-        res_out = self.resblock(init) 
-        res_out = res_out + init
-        for i in range(self.n_resblocks):
-            res_out = self.resblock(res_out) + res_out
-        out = self.convbn(res_out) + init
-        output = self.convblock_lg(out)
-        return output.view(-1, *self.shape)
+    def forward(self, x):
+        x1 = self.init(x)
+        x2 = self.enc1(x)
+        x3 = self.enc2(x)
+        x4 = self.enc3(x)
+        x5 = self.enc4(x)
+        x = self.dec4(x5, x4)
+        x = self.dec4(x, x3)
+        x = self.dec4(x, x2)
+        x = self.dec4(x, x1)
+        out = self.out(x)
+        return out.view(-1, 3, 224, 224)

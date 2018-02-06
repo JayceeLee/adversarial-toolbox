@@ -7,6 +7,7 @@ from scipy.misc import imshow
 
 import torch
 import torchvision
+import torchvision.transforms as transforms
 import  torchvision.models as models
 from torch import nn
 from torch import autograd
@@ -19,8 +20,6 @@ import utils
 import encoders
 import generators
 import discriminators
-from data import mnist
-from data import cifar10
 from vgg import vgg19, vgg19_bn, VGGextraction
 
 #TODO
@@ -66,8 +65,15 @@ def load_models(args):
 
         elif args.dataset == 'imagenet':
             downsize = 224 // args.downsample
-            netG = generators.SRResNet(args, (3, downsize, downsize)).cuda(0)
-            netD = discriminators.SRdiscriminatorCIFAR(args).cuda(0)
+            netG = generators.SRResNet(args, (3, 96, 96)).cuda(0)
+            netD = discriminators.SRdiscriminator(args).cuda(0)
+            netD = None
+            vgg = vgg19_bn(pretrained=True).cuda(1)
+            netE = VGGextraction(vgg).cuda(1)
+        
+        elif args.dataset == 'raise':
+            netG = generators.SRResNet(args, (3, 96, 96)).cuda(0)
+            netD = discriminators.SRdiscriminator(args).cuda(0)
             netD = None
             vgg = vgg19_bn(pretrained=True).cuda(1)
             netE = VGGextraction(vgg).cuda(1)
@@ -83,7 +89,7 @@ def train():
     netG, netD, netE = load_models(args)
 
     # optimizerD = optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
-    optimizerG = optim.Adam(netG.parameters(), lr=1e-4, betas=(0.5, 0.9))
+    optimizerG = optim.Adam(netG.parameters(), lr=0.0001, betas=(0.5, 0.9))
     vgg_scale = 0.0784 # 1/12.75
     mse_criterion = nn.MSELoss()
     one = torch.FloatTensor([1]).cuda(0)
@@ -92,26 +98,29 @@ def train():
     gen = utils.inf_train_gen(train_gen)
 
     """ train SRResNet with MSE only """
-    for iteration in range(1, 100001):
+    for iteration in range(1, 200001):
         start_time = time.time()
         
-        netG.zero_grad()
         _data_hr = next(gen)
-        real_data_hr = utils.stack_data(args, _data_hr)
-        real_data_lr = utils.scale_data(args, _data_hr)
+        real_data_lr, real_data_hr = utils.scale_data2(args, _data_hr)
         real_data_hr_v = autograd.Variable(real_data_hr)
         real_data_lr_v = autograd.Variable(real_data_lr)
         
         fake_hr = netG(real_data_lr_v)
+
+        netG.zero_grad()
         content_loss = mse_criterion(fake_hr, real_data_hr_v)
+        psnr = ops.psnr(args, content_loss)
         content_loss.backward()
         optimizerG.step()
 
         save_dir = './plots/'+args.dataset
-        plot.plot(save_dir, '/content loss (mse) SRResNet', content_loss.data.cpu().numpy())
-        if iteration % 100 == 99:
-            utils.generate_sr_image(iteration, netG, save_dir, args, real_data_lr_v)
-        if (iteration < 5) or (iteration % 100 == 99):
+        plot.plot(save_dir, '/content_loss_(mse)', content_loss.data.cpu().numpy())
+        plot.plot(save_dir, '/psnr', np.array(psnr))
+        data = (real_data_lr, real_data_hr, fake_hr)
+        if iteration % 20 == 19:
+            utils.generate_sr_image(iteration, netG, save_dir, args, data)
+        if (iteration < 5) or (iteration % 20 == 19):
             plot.flush()
         plot.tick()
         if iteration % 5000 == 0:

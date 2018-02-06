@@ -42,6 +42,7 @@ def load_symmetric(real, adv, n_images=None, shape=299):
     if n_images is None:
         n_images = len(real) - 1
     paths_real = glob.glob(real+'/*.png')
+    files = glob.glob(adv_dir+'*.npy')
     paths_real.sort(key=lambda f: int(filter(str.isdigit, f)))
     paths_adv = glob.glob(adv+'/*.png')
     paths_adv.sort(key=lambda f: int(filter(str.isdigit, f)))

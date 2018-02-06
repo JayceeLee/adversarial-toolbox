@@ -56,7 +56,7 @@ class MNISTdiscriminator(nn.Module):
         return out.view(-1)
 
 
-class SRdiscriminatorCIFAR(nn.Module):
+class SRdiscriminator(nn.Module):
     def __init__(self, args):
         super(SRdiscriminatorCIFAR, self).__init__()
         self.BN = args.batchnorm

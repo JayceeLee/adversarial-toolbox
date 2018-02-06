@@ -1,7 +1,9 @@
-import numpy as np
 import torch
+import numpy as np
 import scipy.misc
+from math import log10
 import torch.autograd as autograd
+import torch.nn as nn
 from scipy.misc import imsave
 
 
@@ -29,3 +31,8 @@ def calc_gradient_penalty(args, model, real_data, gen_data):
         gradients = gradients.view(gradients.size(0), -1)
     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * args.gp
     return gradient_penalty
+
+
+def psnr(args, mse):
+    psnr = 10. * log10(1. / mse.data[0]+0.00001)
+    return psnr

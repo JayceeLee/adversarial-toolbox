@@ -138,11 +138,11 @@ def load_npy(real, adv, n, shape=299):
         n = len(real) - 1
     paths_real = glob(real+'_npy/*.npy')
     print paths_real[0]
-    print paths_real[1][73:76]
+    print paths_real[1][78:95]
     # paths_real.sort(key=lambda f: int(filter(str.isdigit, f[73:76])))
-    paths_real.sort(key=lambda f: int(filter(str.isdigit, f[78:88])))
+    paths_real.sort(key=lambda f: int(filter(str.isdigit, f[78:95])))
     paths_adv = glob(adv+'_npy/*.npy')
-    paths_adv.sort(key=lambda f: int(filter(str.isdigit, f[77:87])))
+    paths_adv.sort(key=lambda f: int(filter(str.isdigit, f[77:95])))
     # paths_adv.sort(key=lambda f: int(filter(str.isdigit, f[72:85])))
     paths_real = paths_real[:n]
     paths_adv = paths_adv[:n]
@@ -150,6 +150,8 @@ def load_npy(real, adv, n, shape=299):
     real = load_path_npy(paths_real, arr=x_real, start=0, end=len(paths_real))
     x_adv = np.empty((len(paths_adv), shape, shape, 3))
     adv = load_path_npy(paths_adv, arr=x_adv, start=0, end=len(paths_adv))
+    imshow(real[48])
+    imshow(adv[48])
     return real, adv
 
 
@@ -469,7 +471,7 @@ def rate(preds_1, preds_5):
 if __name__ == '__main__':
 
     args = load_args()
-    real, adv = load_images(args.attack, args.dataset, args.model, n=500)
+    real, adv = load_images(args.attack, args.dataset, args.model, n=50)
     if args.dataset == 'imagenet': n_classes = 1001
     if args.dataset == 'cifar': n_classes = 10
     if args.dataset == 'mnist': n_classes = 10
@@ -483,11 +485,13 @@ if __name__ == '__main__':
     model = load_model(graph, sess, args.model, n_classes)
 
     # test_dip(real, adv, model, sess)
-    test_bf_params(real, adv, model, sess)
+    # test_bf_params(real, adv, model, sess)
     # vanilla differences
     # weed out non adversarials
     diff = 0
-   
+    print np.max(real[48]), np.max(adv[48])
+    imshow(real[48])
+    imshow(adv[48])
     preds = predictions_tf(graph, sess, model, real, 1)
     preds2 = predictions_tf(graph, sess, model, adv, 1)
 
@@ -497,6 +501,7 @@ if __name__ == '__main__':
             diff += 1
         else:
             bad_idx.append(i)
+        print p_r, p_adv, np.max(real[i]), np.max(adv[i])
     print "preliminary model difference on set: {} true adversarials".format(diff)
 
     real_good = np.array([real[i] for i in range(len(real)) if i not in bad_idx])
